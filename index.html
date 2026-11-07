@@ -1,0 +1,852 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>从 DNA 到蛋白质 · 一个细胞里的旅程</title>
+<style>
+*{box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#01020a;color:#e8f0ff;font:14px/1.55 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif;overflow:hidden;touch-action:none}
+canvas{display:block;position:fixed;inset:0}
+#vg{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 45%,transparent 45%,#000a 100%)}
+#ui{position:fixed;inset:0;pointer-events:none}
+#chips{position:absolute;top:calc(env(safe-area-inset-top,0px) + 10px);left:0;right:0;display:flex;gap:6px;justify-content:center}
+.chip{padding:4px 12px;border-radius:99px;background:#0009;border:1px solid #fff3;font-size:12px;opacity:.4;transition:.6s}
+.chip.on{opacity:1;background:#2a6cffcc;border-color:#9fc0ff}
+#cap{position:absolute;left:50%;transform:translateX(-50%);width:min(94vw,660px);bottom:calc(env(safe-area-inset-bottom,0px) + 68px);padding:12px 16px;border-radius:14px;background:linear-gradient(#0a1230aa,#050a1ccc);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid #8fb6ff33;transition:opacity .5s}
+#cap b{font-size:clamp(15px,4.2vw,19px);color:#bcd4ff;letter-spacing:.04em}#cap p{margin-top:2px;font-size:clamp(12.5px,3.5vw,14.5px);color:#d9e4ff}
+#ctl{position:absolute;left:50%;transform:translateX(-50%);width:min(94vw,660px);bottom:calc(env(safe-area-inset-bottom,0px) + 14px);display:flex;gap:10px;align-items:center;pointer-events:auto}
+#ctl button{display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:50%;border:1px solid #8fb6ff66;background:#0a1230cc;color:#fff;font-size:17px;cursor:pointer;transition:background .25s,border-color .25s,opacity .25s}#ctl button:hover{background:#162658dd;border-color:#9fc0ff}#ctl button.off{opacity:.55;border-color:#8fb6ff33}#go{cursor:pointer}
+#pb{flex:1;height:34px;display:flex;align-items:center}#pb s{display:block;width:100%;height:4px;border-radius:4px;background:#fff2;overflow:hidden}#bar{display:block;height:100%;width:0;background:linear-gradient(90deg,#5dffc6,#5aa9ff,#ff9a3c)}
+.lb{position:fixed;left:0;top:0;padding:2px 9px;border-radius:7px;background:#000b;border:1px solid #8fb6ffaa;font-size:12px;white-space:nowrap;opacity:0;pointer-events:none;will-change:transform}
+#st{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;background:radial-gradient(#0d1f55,#01020a 70%);z-index:9;padding:24px;transition:opacity 1s}
+#st h1{font-size:clamp(28px,8vw,52px);letter-spacing:.08em;font-weight:700;background:linear-gradient(90deg,#5dffc6,#5aa9ff,#ff9a3c);-webkit-background-clip:text;background-clip:text;color:transparent}
+#st p{color:#a9bde8}#go{margin-top:12px;padding:13px 34px;border-radius:99px;border:1px solid #9fc0ff;background:#2a6cff;color:#fff;font-size:17px}
+</style></head><body>
+<div id="vg"></div><div id="ui"><div id="chips"><span class="chip">DNA 复制</span><span class="chip">转录与剪接</span><span class="chip">翻译与折叠</span><span class="chip">分选与分泌</span></div>
+<div id="cap"><b id="ct"></b><p id="cd"></p></div>
+<div id="ctl"><button id="pp" title="播放/暂停"></button><div id="pb"><s><i id="bar"></i></s></div><button id="rp" title="重播"></button><button id="mu" title="音乐开关"></button></div></div>
+<div id="st"><h1>从 DNA 到蛋白质</h1><p>一个细胞里的旅程：复制 · 转录剪接 · 翻译折叠 · 分选分泌与胞吐<br>电影式一镜到底，自动运镜（约 3 分 42 秒）</p><button id="go"><svg width="16" height="16" viewBox="0 0 24 24" style="vertical-align:-2px;margin-right:8px"><path d="M6 3.5v17l15-8.5z" fill="#fff"/></svg>开始观看</button><p id="ld" style="font-size:12px"></p></div>
+<script src="lib/three.min.js" onerror="this.onerror=null;var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';s.onload=function(){go()};s.onerror=function(){document.getElementById('ld').textContent='三维库加载失败：请联网，或把 three.min.js 放入 lib 文件夹'};document.head.appendChild(s)"></script>
+<script>
+function go(){
+const T=THREE,$=i=>document.getElementById(i),sm=(a,b,x)=>{x=Math.min(1,Math.max(0,(x-a)/(b-a)));return x*x*(3-2*x)},lp=(a,b,t)=>a+(b-a)*t,v3=(x,y,z)=>new T.Vector3(x,y,z);
+let seed=7;const rnd=()=>(seed=seed*16807%2147483647)/2147483647;
+const R=new T.WebGLRenderer({antialias:true});R.setPixelRatio(Math.min(devicePixelRatio,2));R.toneMapping=T.ACESFilmicToneMapping;R.toneMappingExposure=1.0;R.outputEncoding=T.sRGBEncoding;document.body.prepend(R.domElement);
+const S=new T.Scene();S.background=new T.Color(0x01020a);S.fog=new T.FogExp2(0x03091c,.001);
+const C=new T.PerspectiveCamera(55,1,.5,9000);S.add(C);C.add(new T.PointLight(0xc4dcff,.9,320,1.5));
+S.add(new T.AmbientLight(0x6272a8,.4));const dl=new T.DirectionalLight(0xffffff,.8);dl.position.set(.5,1,.7);S.add(dl);const d2l=new T.DirectionalLight(0x7a5cff,.35);d2l.position.set(-1,-.4,-.6);S.add(d2l);
+const gc=document.createElement('canvas');gc.width=gc.height=64;const g2=gc.getContext('2d'),gr=g2.createRadialGradient(32,32,0,32,32,32);gr.addColorStop(0,'#fff');gr.addColorStop(.3,'#fff6');gr.addColorStop(1,'#fff0');g2.fillStyle=gr;g2.fillRect(0,0,64,64);const GT=new T.CanvasTexture(gc);
+const GL=[],glow=(c,s,p,o)=>{const m=new T.Sprite(new T.SpriteMaterial({map:GT,color:c,blending:T.AdditiveBlending,transparent:true,depthWrite:false,fog:false}));m.userData.o=o||.5;m.scale.setScalar(s);if(p)m.position.copy(p);GL.push(m);return m};
+const dust=(n,r0,r1,c,sz,cz)=>{const a=new Float32Array(n*3);for(let i=0;i<n;i++){const r=lp(r0,r1,Math.cbrt(rnd())),u=rnd()*2-1,p=rnd()*6.283,q=Math.sqrt(1-u*u);a[i*3]=r*q*Math.cos(p);a[i*3+1]=r*u;a[i*3+2]=r*q*Math.sin(p)+cz}const g=new T.BufferGeometry();g.setAttribute('position',new T.BufferAttribute(a,3));const P=new T.Points(g,new T.PointsMaterial({map:GT,color:c,size:sz,transparent:true,opacity:.5,blending:T.AdditiveBlending,depthWrite:false}));S.add(P);return P};
+const dA=dust(1800,10,195,0x6d9bff,3.5,0),dB2=dust(5000,215,820,0x58d0c0,5,150);
+// ===== 细胞环境 =====
+const NR=200,sg=new T.SphereGeometry(1,16,12),sg2=new T.SphereGeometry(1,40,28),cg=new T.CylinderGeometry(1,1,1,8,1);
+const stdM=(e,r)=>new T.MeshStandardMaterial({roughness:r||.35,metalness:.15,emissive:e||0x111122});
+const im=(geo,n,mat)=>{const m=new T.InstancedMesh(geo,mat,n);m.frustumCulled=false;m.instanceMatrix.setUsage(T.DynamicDrawUsage);S.add(m);return m};
+const nf=(m,a,b)=>{m.transparent=true;m.depthWrite=false;m.onBeforeCompile=s=>{s.uniforms.nfA={value:a||30};s.uniforms.nfB={value:b||120};s.fragmentShader=s.fragmentShader.replace('void main() {','uniform float nfA;uniform float nfB;\nvoid main() {').replace('vec4 diffuseColor = vec4( diffuse, opacity );','vec4 diffuseColor = vec4( diffuse, opacity*smoothstep(nfA,nfB,length(vViewPosition)) );')};return m};
+const shM=new T.MeshPhysicalMaterial({color:0x5b7dff,transparent:true,opacity:.1,roughness:.15,side:T.DoubleSide,depthWrite:false,emissive:0x1a2a8a,emissiveIntensity:.25});
+S.add(new T.Mesh(new T.SphereGeometry(NR,64,48),shM),new T.Mesh(new T.SphereGeometry(NR+7,64,48),shM));
+S.add(new T.Mesh(new T.SphereGeometry(900,48,36),new T.MeshPhysicalMaterial({color:0x2aa6ff,transparent:true,opacity:.1,side:T.BackSide,emissive:0x0a3a6a,emissiveIntensity:.6,depthWrite:false})).translateZ(150));
+const rimM=(c,b,r,pw)=>new T.ShaderMaterial({transparent:true,depthWrite:false,side:T.DoubleSide,blending:T.AdditiveBlending,uniforms:{col:{value:new T.Color(c)},base:{value:b},rim:{value:r},pw:{value:pw},k:{value:1}},vertexShader:'varying vec3 vN,vV;void main(){vN=normalize(normalMatrix*normal);vec4 mv=modelViewMatrix*vec4(position,1.);vV=-mv.xyz;gl_Position=projectionMatrix*mv;}',fragmentShader:'uniform vec3 col;uniform float base,rim,pw,k;varying vec3 vN,vV;void main(){float f=pow(1.-abs(dot(normalize(vN),normalize(vV))),pw);gl_FragColor=vec4(col,(base+rim*f)*k);}'});
+const nuM=rimM(0x9a8cff,.05,1.1,2.0),cmM=rimM(0x3ab6ff,.06,1.0,2.2),cm=new T.Mesh(new T.SphereGeometry(900,64,48),cmM);cm.position.z=150;S.add(cm,new T.Mesh(new T.SphereGeometry(NR+1,64,48),nuM),new T.Mesh(new T.SphereGeometry(NR+8,64,48),nuM));
+const skin=(n,r,c,sz,cz)=>{const a=new Float32Array(n*3);for(let i=0;i<n;i++){const y=1-2*(i+.5)/n,q=Math.sqrt(1-y*y),f=i*2.39996;a[i*3]=r*q*Math.cos(f);a[i*3+1]=r*y;a[i*3+2]=r*q*Math.sin(f)+cz}const g=new T.BufferGeometry();g.setAttribute('position',new T.BufferAttribute(a,3));const P=new T.Points(g,new T.PointsMaterial({map:GT,color:c,size:sz,transparent:true,opacity:.9,blending:T.AdditiveBlending,depthWrite:false}));S.add(P);return P};
+skin(9000,900,0x6fd0ff,13,150);skin(9000,880,0x3a8cff,13,150);const nuO=skin(3500,NR+8,0xb8a8ff,4.5,0),nuI=skin(3500,NR+1,0x8a78ff,4.5,0);
+const pn=46,pores=im(new T.TorusGeometry(11,3,12,28),pn+1,new T.MeshStandardMaterial({color:0x6c8cff,emissive:0x1a2a6a,roughness:.4})),o=new T.Object3D();
+for(let k=0;k<=pn;k++){const y=1-2*(k+.5)/pn,r=Math.sqrt(1-y*y),f=k*2.39996,d=k==pn?v3(0,0,1):v3(Math.cos(f)*r,y,Math.sin(f)*r);o.position.copy(d).multiplyScalar(NR+3);o.lookAt(o.position.clone().multiplyScalar(2));o.scale.setScalar(k==pn?2.4:d.z>.93?1e-3:1);o.updateMatrix();pores.setMatrixAt(k,o.matrix)}
+S.add(glow(0x6f98ff,110,v3(0,0,205),.3));
+const chm=new T.MeshStandardMaterial({color:0x9a4a86,emissive:0x2a0a22,transparent:true,opacity:.55,roughness:.5});
+for(let i=0;i<14;i++){const p=[];for(let j=0;j<9;j++)p.push(v3(rnd()-.5,rnd()-.5,rnd()-.5).normalize().multiplyScalar(lp(105,160,rnd())));S.add(new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(p,true),160,lp(1,2.4,rnd()),6,true),chm))}
+const nucM=new T.MeshStandardMaterial({color:0x8a5cff,emissive:0x2a1070,transparent:true,opacity:.6}),nuc=new T.Mesh(sg,nucM);nuc.position.set(-110,-70,-70);nuc.scale.setScalar(30);S.add(nuc);
+const erM=new T.MeshStandardMaterial({color:0x5fc7a4,emissive:0x0e4a3a,transparent:true,opacity:.6,roughness:.5});
+erM.side=T.DoubleSide;const ERC=[];for(let i=0,n=0;n<7&&i<80;i++){const ph=rnd()*6.283,pl=1.5+rnd()*1.2,th=.5+rnd()*1.3,tl=.7+rnd()*.5,pcc=ph+pl/2,tc=th+tl/2,r=218+(n%3)*13,d=v3(-Math.cos(pcc)*Math.sin(tc),Math.cos(tc),Math.sin(pcc)*Math.sin(tc));if(d.z>.5)continue;n++;S.add(new T.Mesh(new T.SphereGeometry(r,40,24,ph,pl,th,tl),erM));ERC.push(d.multiplyScalar(r+4))}
+const mitM=new T.MeshStandardMaterial({color:0xff8a3d,emissive:0x602200,roughness:.4,transparent:true}),rbiM=stdM(0x1a3a3a),mi=im(sg,8,mitM),rbi=im(sg,220,rbiM);rbiM.transparent=true;
+for(let i=0;i<8;i++){const p=v3(rnd()-.5,rnd()-.5,rnd()-.5).normalize().multiplyScalar(lp(340,700,rnd()));p.z+=150;if(Math.abs(p.x)<130&&Math.abs(p.y)<130&&p.z>150)p.x+=260;o.position.copy(p);o.rotation.set(rnd()*6,rnd()*6,rnd()*6);o.scale.set(44,18,18);o.updateMatrix();mi.setMatrixAt(i,o.matrix)}
+for(let i=0;i<220;i++){const p=v3(rnd()-.5,rnd()-.5,rnd()-.5).normalize().multiplyScalar(lp(250,800,rnd()));p.z+=150;if(Math.abs(p.x)<100&&Math.abs(p.y)<100&&p.z>150)p.x+=200;o.position.copy(p);o.rotation.set(0,0,0);o.scale.setScalar(rnd()*3+3);o.updateMatrix();rbi.setMatrixAt(i,o.matrix);rbi.setColorAt(i,new T.Color().setHSL(.5,.5,.55))}
+[chm,nucM,erM,mitM,rbiM,pores.material].forEach(m=>nf(m));const ENVC=[chm,nucM],ENVY=[erM,mitM,rbiM,dB2.material],ENVS=[shM],ENVP=[pores.material];[...ENVC,...ENVY,...ENVS,...ENVP].forEach(m=>m.userData.b=m.opacity);const fdm=(L,o)=>L.forEach(m=>{m.opacity=m.userData.b*o;m.visible=o>.01});
+// ===== DNA =====
+const N=60,RS=3,RD=8,TW=.6,DOFF=27,BC=[0xff5a6e,0x5aa9ff,0xffd04a,0x52e0a8],UC=0xb57bff,gene='ATGGCTGAAAGCTTCGGACTGGTTCCATAA',cmp=b=>[1,0,3,2][b],xi=i=>(i-(N-1)/2)*RS,seq=[];
+for(let i=0;i<N;i++)seq.push(i>=15&&i<45?'ATGC'.indexOf(gene[i-15]):Math.floor(rnd()*4));
+const M=new T.Matrix4(),Q=new T.Quaternion(),P1=new T.Vector3(),P2=new T.Vector3(),P3=new T.Vector3(),P4=new T.Vector3(),S1=new T.Vector3(),Dv=new T.Vector3(),Y=v3(0,1,0),Z0=new T.Quaternion();
+const ball=(m,i,p,s)=>{M.compose(p,Z0,S1.setScalar(Math.max(s,1e-4)));m.setMatrixAt(i,M)};
+const rod=(m,i,a,b,r,v)=>{Dv.subVectors(b,a);const l=Dv.length();if(l<1e-4||v<=0)M.makeScale(1e-4,1e-4,1e-4);else{Q.setFromUnitVectors(Y,Dv.multiplyScalar(1/l));M.compose(P1.addVectors(a,b).multiplyScalar(.5),Q,S1.set(r*v,l*v,r*v))}m.setMatrixAt(i,M)};
+const NN=N*4,pos=[],axv=[],RV=[],av=new Float32Array(NN);
+for(let i=0;i<NN;i++){pos.push(v3(0,0,0));axv.push(v3(0,0,0));RV.push(v3(rnd()-.5,rnd()-.5,rnd()-.5).normalize().multiplyScalar(.6+rnd()*.5))}
+const sS=im(sg,NN,stdM(0x0a1030,.3)),sB=im(cg,NN,stdM(0x101010,.4)),sK=im(cg,NN,stdM(0x0a1030,.3)),OLD=new T.Color(0x3f78ff),NEW=new T.Color(0x22f0a4);
+for(let i=0;i<N;i++)for(let k=0;k<4;k++){const x=i*4+k,b=k==0||k==3?seq[i]:cmp(seq[i]);sS.setColorAt(x,k<2?OLD:NEW);sK.setColorAt(x,k<2?OLD:NEW);sB.setColorAt(x,new T.Color(BC[b]))}
+function dna(fk,sb,ip,bf){for(let i=0;i<N;i++){const x=xi(i),d=fk-x,s=sm(0,40,d),th=i*TW,bi=Math.min(i-i%12+11,N-1),bub=sm(0,1,1-Math.abs(i-ip)/5)*bf;
+for(let k=0;k<4;k++){const idx=i*4+k,A=k%2==0,a=k<2?1:k==2?sm(6,24,d):sm(0,12,fk-xi(bi)-(bi-i)*1.3-4),cy=(A?1:-1)*(DOFF*s+(A?0:sb*s)),cz=A?0:-sb*.4*s,ang=th+(k==1||k==2?Math.PI:0),r=RD*(A?1+.7*bub:1),p=pos[idx].set(x,cy+r*Math.cos(ang),cz+r*Math.sin(ang)),ax=axv[idx].set(x,cy,cz);
+if(k>1)p.addScaledVector(RV[idx],(1-a)*110);av[idx]=a;ball(sS,idx,p,2.5*Math.pow(a,.6));rod(sB,idx,p,P2.copy(p).lerp(ax,.97-(A?.5*bub:0)),1.25,a);
+if(i&&!(k==3&&i%12==0))rod(sK,idx,p,pos[idx-4],.95,Math.min(a,av[idx-4]));else rod(sK,idx,p,p,1,0)}}
+[sS,sB,sK].forEach(m=>m.instanceMatrix.needsUpdate=true)}
+const blob=(c,r)=>{const g=new T.Group(),m=new T.MeshPhysicalMaterial({color:c,transparent:true,opacity:.4,roughness:.25,emissive:c,emissiveIntensity:.25,depthWrite:false});nf(m,6,24);[[0,0,0,1],[.9,.3,.2,.7],[-.8,.4,-.3,.75],[.1,-.7,.5,.65]].forEach(a=>{const s=new T.Mesh(sg2,m);s.position.set(a[0]*r,a[1]*r,a[2]*r);s.scale.setScalar(a[3]*r);g.add(s)});g.add(glow(c,r*5));S.add(g);return g};
+const hel=new T.Group(),hm=new T.Mesh(new T.TorusGeometry(14,4,16,32),new T.MeshStandardMaterial({color:0xff3fb8,emissive:0x7a0f55,roughness:.3}));hm.rotation.y=Math.PI/2;hel.add(hm,glow(0xff5ad0,70));S.add(hel);
+const pol1=blob(0x39e0ff,10),pol2=blob(0x39e0ff,10),rnap=blob(0xff9a3c,17);const halo=glow(0x2f66ff,240,v3(0,0,0),.16);halo.userData.nf=1;S.add(halo);
+// ===== mRNA 与路径 =====
+const MN=30,DU=3.2,mS=im(sg,MN,stdM(0x3a1c00)),mB=im(cg,MN,stdM()),mK=im(cg,MN,stdM(0x3a1c00)),mp=[],UPV=v3(0,5,0);
+for(let j=0;j<MN;j++){mp.push(v3(0,0,0));const b='ATGC'.indexOf(gene[j]);mS.setColorAt(j,new T.Color(0xff9a3c));mK.setColorAt(j,new T.Color(0xff9a3c));mB.setColorAt(j,new T.Color(b==1?UC:BC[b]))}
+const RX=60,RY=-4,RZ=290,pc=new T.CatmullRomCurve3([[-47,49,0],[-75,60,35],[-60,45,100],[-20,15,165],[0,0,200],[0,0,215],[-12,-3,252],[0,RY,RZ],[60,RY,RZ],[120,RY,RZ],[240,RY,RZ]].map(a=>v3(...a)),false,'centripetal');pc.arcLengthDivisions=1500;
+const PL=pc.getLength(),PA=u=>pc.getPointAt(Math.min(1,Math.max(0,u/PL)));let PS=0,bd=1e9;for(let u=0;u<PL;u+=.5){const d=PA(u).distanceTo(v3(RX,RY,RZ));if(d<bd){bd=d;PS=u}}
+function mr(ip,uH){let pa=0;for(let j=0;j<MN;j++){const i=15+j,a=sm(0,2.5,ip-i+.5),x=i*4+2,u=uH-j*DU;
+P3.copy(axv[x]).lerp(pos[x],.45).lerp(P4.set(xi(i),axv[x].y+24,0),sm(0,7,ip-i));mp[j].copy(P3).lerp(PA(u),sm(-8,10,u));
+ball(mS,j,mp[j],2.6*a);rod(mB,j,mp[j],P2.copy(mp[j]).add(UPV),1.2,a);j?rod(mK,j,mp[j],mp[j-1],1.0,Math.min(a,pa)):rod(mK,0,mp[0],mp[0],1,0);pa=a}
+[mS,mB,mK].forEach(m=>m.instanceMatrix.needsUpdate=true)}
+// ===== 剪接体与内含子套索 (真核生物 pre-mRNA 剪接机制) =====
+const P_splice=v3(-70,56,52),spliceosomeGroup=new T.Group();
+const snRnpMat=nf(new T.MeshPhysicalMaterial({color:0xa855f7,emissive:0x581c87,emissiveIntensity:.55,roughness:.28,transparent:true,opacity:.45,depthWrite:false}),8,32);
+[[-4.2,3.8,1.8,4.6],[3.8,3.2,-2.2,5.0],[4.5,-2.8,-1.8,4.4],[-1.2,-4.0,3.4,5.4],[0,1.2,0,6.2]].forEach(a=>{const m=new T.Mesh(sg2,snRnpMat);m.position.set(a[0],a[1],a[2]);m.scale.setScalar(a[3]);spliceosomeGroup.add(m)});
+spliceosomeGroup.add(glow(0xc084fc,55,v3(0,0,0),.45));spliceosomeGroup.position.copy(P_splice);spliceosomeGroup.scale.setScalar(1e-4);
+const lariatGroup=new T.Group(),lariatMat=stdM(0xf43f5e,.3);lariatMat.emissive=new T.Color(0x9f1239);lariatMat.emissiveIntensity=.5;
+const lariatRing=new T.Mesh(new T.TorusGeometry(5.0,.85,12,32),lariatMat);lariatRing.rotation.x=Math.PI*.35;lariatGroup.add(lariatRing);
+const branchPt=new T.Mesh(sg,stdM(0xfbbf24,.2));branchPt.position.set(5.0,0,0);branchPt.scale.setScalar(1.5);lariatGroup.add(branchPt,glow(0xfbbf24,14,branchPt.position,.6));
+const tailCurve=new T.CatmullRomCurve3([v3(5.0,0,0),v3(8.5,-2.2,1.8),v3(12.5,-3.8,-1.2),v3(16.0,-5.0,.8)]);
+const lariatTail=new T.Mesh(new T.TubeGeometry(tailCurve,20,.65,8,false),lariatMat);lariatGroup.add(lariatTail);
+lariatGroup.position.copy(P_splice.clone().add(v3(2,-2,2)));lariatGroup.scale.setScalar(1e-4);
+const spliceFlash=glow(0xf472b6,1,P_splice,.95);S.add(spliceosomeGroup,lariatGroup,spliceFlash);
+// ===== 核糖体 / tRNA / 肽链 =====
+const rbM=(c,e)=>nf(new T.MeshPhysicalMaterial({color:c,transparent:true,opacity:.36,roughness:.3,emissive:e,emissiveIntensity:.6,depthWrite:false}),8,30),big=new T.Mesh(sg2,rbM(0xffb44a,0x7a4400)),sml=new T.Mesh(sg2,rbM(0xff7a45,0x701c00));big.scale.set(32,22,26);sml.scale.set(26,15,21);S.add(big,sml,glow(0xffa040,170,v3(RX,RY+10,RZ),.25));
+const TIP=v3(1.8,36.8,0),tr=[],M3=c=>new T.MeshStandardMaterial({color:c,emissive:c,emissiveIntensity:.3,roughness:.35}),mA=M3(0xd978b8),mD=M3(0x7c7ae0),mT=M3(0x4a62d0),mC=M3(0x9a55e0),mR=M3(0xeeeeee),
+sgm=(g,a,b,r,mt)=>{const d=b.clone().sub(a),o=new T.Mesh(cg,mt);o.position.copy(a).addScaledVector(d,.5);o.quaternion.setFromUnitVectors(Y,d.clone().normalize());o.scale.set(r,d.length(),r);g.add(o)},
+stem=(g,p0,p1,n,m1)=>{const d=p1.clone().sub(p0).normalize(),pp=v3(-d.y,d.x,0).multiplyScalar(1.8);sgm(g,p0.clone().add(pp),p1.clone().add(pp),.9,m1);sgm(g,p0.clone().sub(pp),p1.clone().sub(pp),.9,m1);for(let i=0;i<n;i++){const c=p0.clone().lerp(p1,(i+.5)/n);sgm(g,c.clone().add(pp),c.clone().sub(pp),.35,mR)}},
+ring=(g,x,y,r,mt)=>{const o=new T.Mesh(new T.TorusGeometry(r,.9,8,24),mt);o.position.set(x,y,0);g.add(o)};
+for(let m=0;m<10;m++){const g=new T.Group(),cod=m<9?gene.substr(m*3,3):'TAA';
+if(m==9){const mm=nf(new T.MeshPhysicalMaterial({color:0xff7aa8,transparent:true,opacity:.55,emissive:0xff4a80,emissiveIntensity:.3,roughness:.3}),6,24);[[0,16,0,9],[5,25,0,6],[-5,9,0,6.5]].forEach(a=>{const o=new T.Mesh(sg2,mm);o.position.set(a[0],a[1],a[2]);o.scale.setScalar(a[3]);g.add(o)})}
+else{for(let q=0;q<3;q++){const b=cmp('ATGC'.indexOf(cod[q])),mt=M3(b==1?UC:BC[b]),x=(q-1)*3.2,o=new T.Mesh(sg,mt);o.position.set(x,0,0);o.scale.setScalar(1.5);g.add(o);sgm(g,v3(x,0,0),v3(x,2.3,0),.5,mt)}
+ring(g,0,5.6,4.8,mC);stem(g,v3(0,10.2,0),v3(0,16.6,0),3,mC);sgm(g,v3(-1.8,16.6,0),v3(-1.8,20.6,0),.9,mC);sgm(g,v3(1.8,16.6,0),v3(1.8,20.6,0),.9,mC);
+stem(g,v3(0,20.6,0),v3(0,29.6,0),4,mA);sgm(g,v3(1.8,29.6,0),v3(1.8,34.5,0),.9,mA);
+const ar=new T.Group();ar.position.set(0,19,0);ar.rotation.y=.85;g.add(ar);stem(ar,v3(-2,0,0),v3(-6.4,0,0),2,mD);ring(ar,-9.2,0,2.7,mD);stem(ar,v3(2,0,0),v3(6.4,0,0),2,mT);ring(ar,9.2,0,2.7,mT)}
+g.add(glow(0x6fe0ff,46,v3(0,18,0),.2));S.add(g);tr.push(g)}
+const bdm=im(sg,9,stdM(0x222222,.3)),bdl=im(cg,8,stdM(0xdddddd,.25));
+const AA_COLS=[0x38e89e,0xffb84d,0xff4d88,0x40c4ff,0xffcc22,0xd8b4fe,0xffaa33,0xff9922,0x7c4dff];
+for(let m=0;m<9;m++)bdm.setColorAt(m,new T.Color(AA_COLS[m]));
+for(let m=0;m<8;m++)bdl.setColorAt(m,new T.Color(0xeeeeee));
+const E0=v3(RX+6,RY+56,RZ),Qp=s=>v3(RX+6+Math.sin(s*.13)*8,RY+56+s*.85,RZ+Math.cos(s*.13)*8-8);
+const exRing=new T.Mesh(new T.TorusGeometry(5.5,1.2,8,24),stdM(0xffaa44,.35));exRing.position.copy(E0);exRing.rotation.x=Math.PI/2;S.add(exRing);
+const FC=v3(RX,RY+126,RZ),fx=glow(0xffe08a,1,FC,.7),bfl=glow(0xfff0a0,1,v3(0,0,0),.9),bp=[...Array(9)].map(()=>v3(0,0,0)),wm=im(sg,9,stdM(0x1a5a9a,.3));
+S.add(fx,bfl);for(let i=0;i<9;i++)wm.setColorAt(i,new T.Color(0x77d4ff));
+
+// ===== 蛋白质各级折叠构象坐标与模型 =====
+const pos1=[v3(FC.x-26,FC.y-5,FC.z+4),v3(FC.x-20,FC.y-1,FC.z-2),v3(FC.x-13,FC.y+4,FC.z+3),v3(FC.x-6,FC.y+1,FC.z-4),v3(FC.x+1,FC.y+5,FC.z+2),v3(FC.x+8,FC.y-1,FC.z-2),v3(FC.x+14,FC.y-5,FC.z+3),v3(FC.x+20,FC.y-2,FC.z-3),v3(FC.x+26,FC.y+3,FC.z+2)];
+const pos2=[v3(FC.x-11+6*Math.cos(0),FC.y-9.5,FC.z+6*Math.sin(0)),v3(FC.x-11+6*Math.cos(1.75),FC.y-4.8,FC.z+6*Math.sin(1.75)),v3(FC.x-11+6*Math.cos(3.5),FC.y,FC.z+6*Math.sin(3.5)),v3(FC.x-11+6*Math.cos(5.25),FC.y+4.8,FC.z+6*Math.sin(5.25)),v3(FC.x-11+6*Math.cos(7),FC.y+9.5,FC.z+6*Math.sin(7)),v3(FC.x-2,FC.y+11.5,FC.z+2.5),v3(FC.x+8,FC.y+7,FC.z+.5),v3(FC.x+9,FC.y-1,FC.z-1.2),v3(FC.x+8,FC.y-8.5,FC.z+1.2)];
+const pos3=[v3(FC.x-5.5,FC.y-4.2,FC.z+3),v3(FC.x-4,FC.y+3.5,FC.z+4.5),v3(FC.x-2.5,FC.y+7.5,FC.z-2.5),v3(FC.x+3.8,FC.y+5,FC.z-4.8),v3(FC.x+2,FC.y+1.2,FC.z+2.2),v3(FC.x+6.5,FC.y+4,FC.z+3.5),v3(FC.x+5.2,FC.y-2.8,FC.z+1.5),v3(FC.x+1.5,FC.y-5,FC.z-2),v3(FC.x-2.8,FC.y-6.2,FC.z-3.5)];
+const pos4=[v3(FC.x-5.2,FC.y-4,FC.z+2.8),v3(FC.x-3.8,FC.y+3.2,FC.z+4.2),v3(FC.x-2.2,FC.y+7.2,FC.z-2.2),v3(FC.x+3.5,FC.y+4.8,FC.z-4.5),v3(FC.x+1.8,FC.y+1,FC.z+2),v3(FC.x+6.2,FC.y+3.8,FC.z+3.2),v3(FC.x+5,FC.y-2.5,FC.z+1.2),v3(FC.x+1.2,FC.y-4.8,FC.z-1.8),v3(FC.x-2.5,FC.y-6,FC.z-3.2)];
+
+// 氨基酸侧链 R 基、N/C 端与苯环
+const scMesh=im(sg,9,stdM(0x222222,.25)),scRods=im(cg,9,stdM(0x555555,.35));
+const SC_COLS=[0xffdd33,0xffaa44,0xff4488,0x40c4ff,0xffcc22,0xffffff,0xffaa33,0xff9922,0x7c4dff];
+const SC_RADS=[1.8,1.4,2.2,1.7,1.2,.9,2.1,1.9,1.8],SC_LENS=[3.8,2.2,4.2,3.0,4.5,1.4,3.8,3.2,2.6];
+for(let k=0;k<9;k++){scMesh.setColorAt(k,new T.Color(SC_COLS[k]));scRods.setColorAt(k,new T.Color(SC_COLS[k]))}
+const pheRing=new T.Mesh(new T.TorusGeometry(1.9,.45,8,16),stdM(0xffcc22,.25)),nTermMesh=new T.Mesh(sg,stdM(0x40c4ff,.25)),cTermMesh=new T.Mesh(sg,stdM(0xff4d88,.25));
+pheRing.scale.setScalar(1e-4);nTermMesh.scale.setScalar(1e-4);cTermMesh.scale.setScalar(1e-4);S.add(pheRing,nTermMesh,cTermMesh);
+
+// 二级结构主链氢键网络
+const hbMat=new T.MeshBasicMaterial({color:0x7cfcff,transparent:true,opacity:0,blending:T.AdditiveBlending,depthWrite:false}),hbCyl=im(cg,6,hbMat);
+const HB_PAIRS=[[0,4],[1,4],[2,5],[6,3],[7,2],[8,1]];
+
+// 三级结构疏水核心、二硫键、盐桥
+const sBridge=im(cg,1,new T.MeshStandardMaterial({color:0xffe066,emissive:0x996600,roughness:.2,metalness:.5}));
+const saltBridge=im(cg,1,new T.MeshStandardMaterial({color:0xff66cc,emissive:0x661144,roughness:.3}));
+const coreGlow=glow(0xff9922,1,FC,.55),ssFlash=glow(0xffe066,1,FC,.85);S.add(coreGlow,ssFlash);
+
+// 成熟天然构象 Ribbon 模型与分子表面
+const nativeCurve=new T.CatmullRomCurve3(pos4,false,'catmullrom',.5);
+const ribbonMat=new T.MeshPhysicalMaterial({color:0x3ab6ff,emissive:0x0c2a5a,emissiveIntensity:.4,roughness:.25,metalness:.15,transparent:true,opacity:0,depthWrite:false});
+const ribbonMesh=new T.Mesh(new T.TubeGeometry(nativeCurve,80,1.4,10,false),ribbonMat);
+const surfMat=rimM(0x50b8ff,.05,1.1,2.4),surfMesh=new T.Mesh(new T.SphereGeometry(15.5,32,24),surfMat);surfMesh.position.copy(FC);
+S.add(ribbonMesh,surfMesh);
+
+// 活性中心催化口袋与底物分子
+const P_active=v3(FC.x-3.2,FC.y+3.8,FC.z+7.2),subMol=new T.Group();
+const smM1=stdM(0x5dffc6,.2),smM2=stdM(0xffd04a,.2),smM3=stdM(0x38bdf8,.2);
+const a1=new T.Mesh(sg,smM1);a1.scale.setScalar(1.9);a1.position.set(-1.8,0,0);
+const a2=new T.Mesh(sg,smM2);a2.scale.setScalar(2.3);a2.position.set(1.4,.7,0);
+const a3=new T.Mesh(sg,smM3);a3.scale.setScalar(1.7);a3.position.set(.5,-1.7,.7);
+const sr1=new T.Mesh(cg,stdM(0xcccccc,.3));sr1.position.set(-.2,.35,0);sr1.quaternion.setFromUnitVectors(Y,v3(3.2,.7,0).normalize());sr1.scale.set(.4,3.2,.4);
+const sr2=new T.Mesh(cg,stdM(0xcccccc,.3));sr2.position.set(.95,-.5,.35);sr2.quaternion.setFromUnitVectors(Y,v3(-.9,-2.4,.7).normalize());sr2.scale.set(.35,2.6,.35);
+subMol.add(a1,a2,a3,sr1,sr2,glow(0x5dffc6,24,v3(0,0,0),.45));subMol.scale.setScalar(1e-4);S.add(subMol);
+
+// 1. 分子伴侣桶状保护笼 (GroEL/ES 样复合物与 ATP 水解)
+const chaperoneGroup=new T.Group(),chapMat=nf(new T.MeshPhysicalMaterial({color:0x38ef7d,emissive:0x083818,emissiveIntensity:.45,roughness:.25,transparent:true,opacity:.35,depthWrite:false}),8,30);
+const cRing1=new T.Mesh(new T.TorusGeometry(12.5,1.4,10,28),chapMat);cRing1.position.y=12;cRing1.rotation.x=Math.PI/2;
+const cRing2=new T.Mesh(new T.TorusGeometry(12.5,1.4,10,28),chapMat);cRing2.position.y=-12;cRing2.rotation.x=Math.PI/2;
+const cRingMid=new T.Mesh(new T.TorusGeometry(13.8,1.6,10,28),chapMat);cRingMid.rotation.x=Math.PI/2;
+chaperoneGroup.add(cRing1,cRing2,cRingMid);
+for(let i=0;i<7;i++){const ang=i*Math.PI*2/7,col=new T.Mesh(cg,chapMat);col.position.set(Math.cos(ang)*12.5,0,Math.sin(ang)*12.5);col.scale.set(1.2,24,1.2);chaperoneGroup.add(col)}
+const chapLid=new T.Mesh(new T.SphereGeometry(13,24,16,0,Math.PI*2,0,Math.PI*.42),chapMat);chapLid.position.y=13;chapLid.rotation.x=Math.PI;chaperoneGroup.add(chapLid);
+const atpGroup=new T.Group(),atpM1=stdM(0xffd04a,.2),atpM2=stdM(0xff7043,.2);
+for(let i=0;i<2;i++){const atp=new T.Group(),ad=new T.Mesh(sg,atpM1);ad.scale.setScalar(1.9);const p1=new T.Mesh(sg,atpM2);p1.scale.setScalar(1.1);p1.position.set(2.2,0,0);const p2=new T.Mesh(sg,atpM2);p2.scale.setScalar(1.1);p2.position.set(3.8,0,0);atp.add(ad,p1,p2);atp.position.set(Math.cos(i*Math.PI)*16,6,Math.sin(i*Math.PI)*16);atpGroup.add(atp)}
+chaperoneGroup.add(atpGroup);const atpFlash=glow(0xffd04a,1,FC,.85);chaperoneGroup.position.copy(FC);chaperoneGroup.scale.setScalar(1e-4);S.add(chaperoneGroup,atpFlash);
+
+// 2. 质量控制与 26S 蛋白酶体 (降解回收系统)
+const P_proteasome=v3(FC.x+36,FC.y-10,FC.z-18),proteasomeGroup=new T.Group();
+const protMatCore=stdM(0x4f46e5,.35),protMatCap=stdM(0x818cf8,.3);
+for(let i=-1.5;i<=1.5;i+=1){const rRing=new T.Mesh(new T.TorusGeometry(8.5,1.8,10,24),protMatCore);rRing.position.y=i*4.6;rRing.rotation.x=Math.PI/2;proteasomeGroup.add(rRing)}
+[-1,1].forEach(dir=>{const cap=new T.Mesh(new T.CylinderGeometry(7.5,9.5,5,20),protMatCap);cap.position.y=dir*11.5;proteasomeGroup.add(cap)});
+proteasomeGroup.add(glow(0xff5533,26,v3(0,0,0),.45));proteasomeGroup.position.copy(P_proteasome);proteasomeGroup.scale.setScalar(1e-4);S.add(proteasomeGroup);
+const misfoldedGroup=new T.Group(),misMat=stdM(0xff3b30,.4);
+for(let i=0;i<5;i++){const b=new T.Mesh(sg,misMat);b.position.set(Math.sin(i*1.5)*3,Math.cos(i*1.2)*3,Math.sin(i*2.2)*2.5);b.scale.setScalar(2);misfoldedGroup.add(b)}
+const ubMat=new T.MeshStandardMaterial({color:0xffd700,emissive:0x997a00,roughness:.2,metalness:.4});
+for(let i=0;i<4;i++){const ub=new T.Mesh(sg,ubMat);ub.position.set(3+i*2.4,3+i*1.8,0);ub.scale.setScalar(1.5);misfoldedGroup.add(ub,glow(0xffd700,10,ub.position,.4))}
+misfoldedGroup.position.copy(P_proteasome.clone().add(v3(-18,18,12)));misfoldedGroup.scale.setScalar(1e-4);S.add(misfoldedGroup);
+const fragMesh=im(sg,6,stdM(0xff8866,.3));for(let i=0;i<6;i++)ball(fragMesh,i,v3(0,-999,0),1e-4);
+
+// 3. 翻译后修饰 PTMs (磷酸化基团与寡糖链)
+const phosGroup=new T.Group(),phosCore=new T.Mesh(sg,stdM(0xff3b30,.2));phosCore.scale.setScalar(1.8);phosGroup.add(phosCore);
+const oxMat=stdM(0xff0055,.25);[[1,1,1],[-1,-1,1],[-1,1,-1],[1,-1,-1]].forEach(dir=>{const ox=new T.Mesh(sg,oxMat);ox.position.set(dir[0]*1.3,dir[1]*1.3,dir[2]*1.3);ox.scale.setScalar(1.1);phosGroup.add(ox)});
+phosGroup.add(glow(0xff0077,20,v3(0,0,0),.65));phosGroup.scale.setScalar(1e-4);
+const glycanGroup=new T.Group(),glyMat1=stdM(0x2dd4bf,.2),glyMat2=stdM(0x10b981,.2);
+const glyNodes=[v3(0,0,0),v3(2.2,1.4,0),v3(4.4,2.5,1.2),v3(6.2,4,1.8),v3(4.8,4.5,-1.5),v3(6.5,6,-1.8)];
+glyNodes.forEach((p,idx)=>{const g=new T.Mesh(sg,idx%2?glyMat1:glyMat2);g.position.copy(p);g.scale.setScalar(1.4);glycanGroup.add(g);if(idx>0){const parentIdx=idx===4?2:idx-1,rodM=new T.Mesh(cg,stdM(0x88ddbb,.3)),d=p.clone().sub(glyNodes[parentIdx]);rodM.position.copy(glyNodes[parentIdx]).addScaledVector(d,.5);rodM.quaternion.setFromUnitVectors(Y,d.clone().normalize());rodM.scale.set(.35,d.length(),.35);glycanGroup.add(rodM)}});
+const extraGlyM=stdM(0xf59e0b,.2),extraGlyNodes=[v3(8.2,5.2,2.5),v3(8.5,7.5,-2.2)],extraGlyMeshes=[];
+extraGlyNodes.forEach((p,idx)=>{const g=new T.Mesh(sg,extraGlyM);g.position.copy(p);g.scale.setScalar(1e-4);glycanGroup.add(g);extraGlyMeshes.push(g);const parentIdx=idx===0?3:5,rodM=new T.Mesh(cg,stdM(0xfcd34d,.3)),d=p.clone().sub(glyNodes[parentIdx]);rodM.position.copy(glyNodes[parentIdx]).addScaledVector(d,.5);rodM.quaternion.setFromUnitVectors(Y,d.clone().normalize());rodM.scale.set(.35,d.length(),.35);rodM.scale.setScalar(1e-4);glycanGroup.add(rodM);extraGlyMeshes.push(rodM)});
+glycanGroup.add(glow(0x2dd4bf,22,v3(3,3,0),.5));glycanGroup.scale.setScalar(1e-4);
+const cleaveFlash=glow(0x6fe0ff,1,FC,.85),phosFlash=glow(0xff00aa,1,FC,.85);S.add(phosGroup,glycanGroup,cleaveFlash,phosFlash);
+
+// 4. 四级结构 (多亚基聚合：亚基 B 拼装模型)
+const subBGroup=new T.Group(),subBMat=new T.MeshPhysicalMaterial({color:0x818cf8,emissive:0x1e1b4b,emissiveIntensity:.45,roughness:.24,metalness:.15,transparent:true,opacity:0,depthWrite:false});
+const subBCurve=new T.CatmullRomCurve3(pos4.map(p=>v3(p.x-14,p.y+1.2,p.z+5.5)),false,'catmullrom',.5);
+const subBMesh=new T.Mesh(new T.TubeGeometry(subBCurve,80,1.35,10,false),subBMat);
+const subBSurfMat=rimM(0x93c5fd,.05,1.1,2.4),subBSurf=new T.Mesh(new T.SphereGeometry(15,32,24),subBSurfMat);subBSurf.position.copy(FC.clone().add(v3(-14,1.2,5.5)));
+subBGroup.add(subBMesh,subBSurf);subBGroup.scale.setScalar(1e-4);
+const interBridge=im(cg,2,new T.MeshStandardMaterial({color:0xffe066,emissive:0x996600,roughness:.2,metalness:.5}));S.add(subBGroup);
+
+// 5. 靶向运输囊泡 (Transport Vesicle)
+const vesicleGroup=new T.Group(),vesMat=new T.MeshPhysicalMaterial({color:0x5eead4,transparent:true,opacity:.26,roughness:.2,side:T.DoubleSide,depthWrite:false,emissive:0x0f766e,emissiveIntensity:.35});
+const vesMesh=new T.Mesh(new T.SphereGeometry(26,32,24),vesMat),vesRim=new T.Mesh(new T.SphereGeometry(26.8,32,24),rimM(0x5eead4,.06,1.2,2.2));
+const coatGroup=new T.Group();for(let i=0;i<24;i++){const lat=(i/24)*Math.PI-Math.PI/2,lon=i*2.39996,cp=v3(Math.cos(lat)*Math.cos(lon),Math.sin(lat),Math.cos(lat)*Math.sin(lon)).multiplyScalar(27.2),cDot=new T.Mesh(sg,stdM(0x99f6e4,.3));cDot.position.copy(cp);cDot.scale.setScalar(1.2);coatGroup.add(cDot)}
+vesicleGroup.add(vesMesh,vesRim,coatGroup,glow(0x2dd4bf,70,v3(0,0,0),.45));vesicleGroup.scale.setScalar(1e-4);S.add(vesicleGroup);
+
+// 6. 高尔基体 (Golgi Apparatus) 扁平囊叠层
+const P_golgi=v3(220,240,480),golgiGroup=new T.Group();
+const dirTraffic=v3(420-60,360-122,830-290).normalize();
+const GOLGI_COLS=[0xf59e0b,0xf97316,0xef4444,0xf43f5e],GOLGI_EMIS=[0x78350f,0x7c2d12,0x7f1d1d,0x831843];
+for(let i=0;i<4;i++){
+  const gMat=nf(new T.MeshPhysicalMaterial({color:GOLGI_COLS[i],emissive:GOLGI_EMIS[i],emissiveIntensity:.5,roughness:.25,transparent:true,opacity:.42,side:T.DoubleSide,depthWrite:false}),15,70);
+  const cRadius=44+i*4.5,cTube=4.6-i*.35;
+  const cMesh=new T.Mesh(new T.TorusGeometry(cRadius,cTube,12,36,Math.PI*.88),gMat);
+  cMesh.position.set(0,(1.5-i)*14,(i-1.5)*6.5);
+  cMesh.rotation.x=Math.PI*.45;cMesh.rotation.z=Math.PI*.08*(i-1.5);cMesh.scale.set(1,.38,1);
+  const cap1=new T.Mesh(sg2,gMat),cap2=new T.Mesh(sg2,gMat);
+  cap1.position.set(cRadius,(1.5-i)*14,0);cap1.scale.setScalar(cTube*1.4);
+  cap2.position.set(cRadius*Math.cos(Math.PI*.88),(1.5-i)*14,cRadius*Math.sin(Math.PI*.88)*.38);cap2.scale.setScalar(cTube*1.4);
+  golgiGroup.add(cMesh,cap1,cap2);
+}
+const gVesMat=stdM(0xfbbf24,.25);
+for(let k=0;k<24;k++){
+  const gv=new T.Mesh(sg,gVesMat),ang=(k/24)*Math.PI*2,rad=48+((k*9)%21);
+  gv.position.set(Math.cos(ang)*rad,((k%5)-2)*11,Math.sin(ang)*rad*.5+((k%3)-1)*15);
+  gv.scale.setScalar(2.6+(k%3)*.8);golgiGroup.add(gv);
+}
+golgiGroup.add(glow(0xf59e0b,180,v3(0,0,0),.42));
+golgiGroup.quaternion.setFromUnitVectors(v3(0,1,0),dirTraffic);
+golgiGroup.position.copy(P_golgi);S.add(golgiGroup);
+
+// 7. SNARE 介导质膜融合与胞吐 (SNARE Complex & Exocytosis)
+const P_membrane=v3(420,360,830),P_extracellular=v3(470,400,910);
+const dirMemNormal=P_membrane.clone().sub(v3(0,0,150)).normalize();
+const membraneGroup=new T.Group();
+const memPatchMat=nf(new T.MeshPhysicalMaterial({color:0x38bdf8,emissive:0x0369a1,emissiveIntensity:.4,roughness:.3,transparent:true,opacity:.38,side:T.DoubleSide,depthWrite:false}),15,70);
+const memDisk=new T.Mesh(new T.CylinderGeometry(70,70,3.5,36,1,true),memPatchMat);
+memDisk.rotation.x=Math.PI/2;
+membraneGroup.add(memDisk);
+const poreMat=stdM(0x67e8f9,.2);poreMat.emissive=new T.Color(0x0e7490);
+const poreRing=new T.Mesh(new T.TorusGeometry(5,2.2,16,36),poreMat);
+poreRing.rotation.x=Math.PI/2;
+membraneGroup.add(poreRing);
+const lipidDots=im(sg,64,stdM(0x7dd3fc,.25));
+for(let i=0;i<64;i++){
+  const r=10+Math.sqrt((i+.5)/64)*56,th=i*2.39996,p=v3(Math.cos(th)*r,Math.sin(th)*r,(i%2===0?2.5:-2.5));
+  ball(lipidDots,i,p,1.6);
+}
+membraneGroup.add(lipidDots);
+membraneGroup.quaternion.setFromUnitVectors(v3(0,0,1),dirMemNormal);
+membraneGroup.position.copy(P_membrane);S.add(membraneGroup);
+const snareGroup=new T.Group(),SNARE_COLS=[0x10b981,0xf43f5e,0x8b5cf6,0xec4899],snareRods=[];
+for(let i=0;i<4;i++){
+  const sMat=stdM(SNARE_COLS[i],.25);sMat.emissive=new T.Color(SNARE_COLS[i]);sMat.emissiveIntensity=.45;
+  const rodM=new T.Mesh(cg,sMat);snareGroup.add(rodM);snareRods.push(rodM);
+}
+snareGroup.quaternion.setFromUnitVectors(v3(0,1,0),dirMemNormal);
+snareGroup.position.copy(P_membrane);snareGroup.scale.setScalar(1e-4);
+const exoFlash=glow(0x38bdf8,1,P_membrane,1.0);S.add(snareGroup,exoFlash);
+const transPath=new T.CatmullRomCurve3([FC.clone(),v3(130,175,380),P_golgi,v3(320,300,650),P_membrane,P_extracellular],false,'centripetal');transPath.arcLengthDivisions=600;
+
+// ===== 运镜 =====
+const K=[[0,130,80,900,30,0,300],[5,70,50,600,10,0,230],[9,12,18,340,0,0,205],[12,0,2,208,0,0,60],[15,-90,35,130,-90,0,0],[18,-150,25,115,-100,0,0],[22,-100,45,72,-62,0,0],[27,-45,-14,62,-22,0,0],[32,5,72,52,20,0,0],[37,55,25,-75,62,0,0],[42,130,45,80,100,0,0],[47,20,40,200,0,0,0],[52,-20,78,105,-5,25,0],[57,-95,62,52,-66,27,0],[63,-50,58,48,-36,28,0],[69,0,70,42,-7,32,0],[75,38,92,48,22,36,0],[81,65,75,55,30,35,0],[85,-38,72,88,-65,52,65],[90,-92,64,105,-65,52,65],[94,-115,55,165,-45,35,95],[98,-45,20,130,-22,12,168],[101,35,16,178,0,0,215],[105,40,10,250,0,-2,240],[108,-35,12,300,20,-4,290],[112,5,32,400,55,0,290],[117,60,22,365,60,8,290],[124,78,38,345,60,14,290],[131,38,62,332,60,18,290],[138,108,34,335,66,22,290],[144,42,92,372,60,56,290],[149,95,150,350,60,126,290],[158,82,128,342,80,118,276],[164,52,136,335,60,126,290],[170,44,132,326,58,126,290],[177,90,140,345,55,126,290],[184,48,135,328,52,126,290],[191,105,170,360,80,140,320],[195,280,295,545,220,240,480],[199,370,350,720,320,300,650],[203,475,415,890,420,360,830],[207,540,460,980,470,400,910],[212,450,600,1350,200,150,500],[217,100,850,1650,0,0,150],[222,-420,400,1850,0,0,170]],END=222;
+function cam(t){const n=K.length;let i=0;while(i<n-2&&t>=K[i+1][0])i++;const a=K[i],b=K[i+1],p0=K[Math.max(i-1,0)],p3=K[Math.min(i+2,n-1)],h=b[0]-a[0],s=Math.min(1,Math.max(0,(t-a[0])/h)),s2=s*s,s3=s2*s,o=[];
+for(let c=1;c<7;c++){const m1=(b[c]-p0[c])/((b[0]-p0[0])||1),m2=(p3[c]-a[c])/((p3[0]-a[0])||1);o.push((2*s3-3*s2+1)*a[c]+(s3-2*s2+s)*h*m1+(-2*s3+3*s2)*b[c]+(s3-s2)*h*m2)}return o}
+// ===== 字幕与标签 =====
+const CAPS=[[0,'序章 · 进入细胞','镜头从细胞质出发，飞向细胞核——遗传信息的“指挥中心”。'],[8,'核孔','核膜上的核孔是大分子进出细胞核的通道，镜头穿过核孔进入细胞核。'],[14,'DNA 双螺旋','两条反向平行的脱氧核苷酸链，碱基互补配对：A–T、G–C（氢键连接）。'],[18,'① DNA 复制 · 解旋','解旋酶打开氢键，双链从复制叉处分开，两条母链都作为模板。'],[26,'① DNA 复制 · 合成子链','DNA 聚合酶按碱基互补配对连接游离脱氧核苷酸：前导链连续合成，滞后链分段合成。'],[41,'半保留复制','每个子代 DNA = 1 条母链（蓝）+ 1 条新链（绿），遗传信息被准确传递。'],[49,'基因的表达','镜头转向其中一个子代 DNA：遗传信息将流向 RNA，再流向蛋白质。'],[57,'② 转录 · 起始','RNA 聚合酶结合基因，局部解旋；以模板链为模板，按互补配对合成 mRNA。'],[70,'② 转录 · 延伸','mRNA 是单链，含尿嘧啶 U 而不含 T；DNA 双链在聚合酶后方重新螺旋。'],[82,'② 转录 · 剪接体与套索','剪接体识别剪接位点，将内含子弯曲切除为套索结构，外显子精准缝合拼接为成熟 mRNA。'],[94,'mRNA 出核','拼接完成并带有保护修饰的成熟 mRNA，经核孔转运出核进入细胞质。'],[108,'来到核糖体','细胞质中的核糖体由大、小亚基组成，是合成蛋白质的“装配车间”。'],[114,'③ 翻译 · 起始','小亚基结合 mRNA，起始密码子 AUG 招募携带甲硫氨酸的 tRNA，大亚基合拢。'],[121,'③ 翻译 · 进位与成肽','tRNA 进入 A 位配对密码子；肽链转移并脱水缩合形成肽键。'],[130,'③ 翻译 · 移位与延伸','核糖体移位，多肽链穿过多肽出口通道（Exit Tunnel）不断延伸。'],[139,'③ 翻译 · 终止与释放','释放因子识别终止密码子，催化肽链断裂释放，亚基解离。'],[145,'④ 分子伴侣辅助折叠','分子伴侣（Hsp/伴侣蛋白）提供保护腔，消耗 ATP 辅助肽链正确折叠，避免错误聚集。'],[155,'⑤ 质量控制与降解回收','错误折叠的受损蛋白被标记多聚泛素（Ub），运入 26S 蛋白酶体腔内水解降解回收。'],[165,'⑥ 翻译后修饰 (PTMs)','切除信号肽前体片段；添加高能磷酸基团（-PO₄²⁻）与寡糖链（糖基化），使蛋白质成熟活化。'],[176,'⑦ 多亚基组装 (四级结构)','独立折叠的亚基通过疏水界面与共价键精准组装成多聚复合物，展现协同催化活性。'],[190,'⑧ 高尔基体加工与分选','运输囊泡承载蛋白质穿梭于高尔基体扁平囊叠层，完成寡糖链进一步成熟修饰与分选打包。'],[200,'⑨ SNARE 介导融合与胞吐','分泌囊泡穿越细胞质抵达质膜，SNARE 蛋白绞合成束诱导膜融合，将蛋白质分泌至细胞外。'],[208,'中心法则 · 生命交响','DNA → RNA → 蛋白质。从遗传密码到空间折叠、修饰组装与跨膜胞吐，生命分子机器日夜不息。']];
+let SB=0,kA=0,cnt=0;const lbs=[['核孔',3,11,()=>v3(0,26,200)],['解旋酶',19,40,()=>hel.position.clone().add(v3(0,20,0))],['DNA 聚合酶 · 前导链',27,40,()=>pol1.position.clone().add(v3(0,15,0))],['滞后链 · 冈崎片段',29,42,()=>pol2.position.clone().add(v3(0,-15,0))],['子代 DNA（旧链＋新链）',44,54,()=>v3(0,40,0)],['子代 DNA（旧链＋新链）',44,54,()=>v3(0,-40-SB*.6,-SB*.4)],['RNA 聚合酶',58,80,()=>rnap.position.clone().add(v3(0,26,0))],['pre-mRNA',68,82,()=>mp[24].clone().add(v3(0,10,0))],['剪接体 (Spliceosome)',82,91,()=>P_splice.clone().add(v3(0,22,0))],['内含子套索 (Lariat)',84,90.5,()=>P_splice.clone().add(v3(8,-10,4))],['外显子拼接 (Exon Splicing)',88.5,93,()=>P_splice.clone().add(v3(-10,14,0))],['成熟 mRNA 出核',95,105,()=>v3(0,26,215)],['核糖体',113,141,()=>v3(RX,RY+74,RZ)],['A 位',119,140,()=>v3(RX-9.6,RY-34,RZ)],['P 位',119,140,()=>v3(RX,RY-34,RZ)],['E 位',119,140,()=>v3(RX+9.6,RY-34,RZ)],['肽键形成 · 脱去水',118.6,122.8,()=>bp[0].clone().lerp(bp[1],.5).add(v3(0,9,0))],['氨基酸',123,129,()=>bp[2].clone().add(v3(0,6,0))],['tRNA',124,131,()=>tr[3].position.clone().add(v3(0,48,0))],['肽链出口通道',130,143,()=>E0.clone().add(v3(12,2,0))],['释放因子 (RF)',139,143.5,()=>tr[9].position.clone().add(v3(0,32,0))],['分子伴侣 (Hsp/伴侣蛋白)',145,154,()=>FC.clone().add(v3(0,20,0))],['ATP 水解供能 · 隔离腔',147,153.5,()=>FC.clone().add(v3(0,-14,0))],['质量控制 (QC)',155,163,()=>P_proteasome.clone().add(v3(0,18,0))],['多聚泛素化标记 (Ub)',155.5,162.5,()=>misfoldedGroup.position.clone().add(v3(0,8,0))],['26S 蛋白酶体 (降解回收)',157,164,()=>P_proteasome.clone().add(v3(0,-18,0))],['翻译后修饰 (PTMs)',165,175,()=>FC.clone().add(v3(0,22,0))],['信号肽切除',165,170,()=>bp[0].clone().add(v3(-10,6,0))],['磷酸化修饰 (-PO₄²⁻)',167,175,()=>phosGroup.position.clone().add(v3(0,7,0))],['寡糖链 (糖基化)',169,175,()=>glycanGroup.position.clone().add(v3(0,10,0))],['四级结构 (多亚基组装)',176,189,()=>FC.clone().add(v3(0,24,0))],['亚基 A + 亚基 B 聚合',178,188,()=>FC.clone().add(v3(-12,16,0))],['协同活性中心催化',183,189,()=>P_active.clone().add(v3(-6,8,4))],['高尔基体 (扁平囊叠层)',190,198,()=>P_golgi.clone().add(v3(0,45,0))],['顺面囊 (cis) → 反面网 (TGN)',191.5,197,()=>P_golgi.clone().add(v3(-35,25,0))],['糖链成熟修饰',193,198,()=>P_golgi.clone().add(v3(30,10,0))],['反面高尔基网 (TGN) 出芽',195.5,200,()=>P_golgi.clone().add(v3(35,-30,0))],['SNARE 蛋白复合体 (绞合引力)',199.5,206,()=>P_membrane.clone().add(v3(0,40,0))],['质膜融合孔 (Fusion Pore)',201,206.5,()=>P_membrane.clone().add(v3(-25,-30,0))],['胞吐作用 (Exocytosis) 释放胞外',202.5,208,()=>P_extracellular.clone().add(v3(0,35,0))],['已分泌至细胞外液',205,218,()=>P_extracellular.clone().add(v3(0,50,0))],['细胞膜 (质膜)',208,222,()=>P_membrane.clone().add(v3(0,80,0))],['高尔基体',208,222,()=>P_golgi.clone().add(v3(0,55,0))],['细胞核 (核膜)',208,222,()=>v3(0,NR+10,0)],['内质网',208,222,()=>ERC[0]||v3(0,NR+30,0)],['分泌至细胞外 (胞吐完成)',208,222,()=>P_extracellular.clone().add(v3(0,38,0))]].map(a=>{const e=document.createElement('div');e.className='lb';e.textContent=a[0];document.body.appendChild(e);return{e,t0:a[1],t1:a[2],f:a[3]}});
+// ===== 主渲染 =====
+const TL0=118,ST=2.6,Zt=k=>TL0+ST*k;
+function render(t){
+const fk=t<17?-300:-105+(t-17)*8.3,sb=90*sm(47,58,t),ip=8+(t-57)*1.6,ipc=Math.min(ip,49),bf=t<57?0:1-sm(82,85,t);SB=sb;
+dna(fk,sb,ipc,bf);
+hel.position.set(fk+3,0,0);hel.scale.setScalar(Math.max(sm(15,17.5,t)*(1-sm(44,47,t))*(1+.06*Math.sin(t*6)),1e-3));
+const dp=Math.max(sm(18,21,t)*(1-sm(46,49,t)),1e-3),dy=DOFF*sm(0,40,24);pol1.position.set(fk-24,dy,0);pol2.position.set(fk-24,-dy-sb*sm(0,40,24),-sb*.4*sm(0,40,24));pol1.scale.setScalar(dp);pol2.scale.setScalar(dp);
+rnap.position.set(xi(ipc),DOFF+30*sm(84,89,t),0);rnap.scale.setScalar(Math.max(sm(54,57,t)*(1-sm(88,92,t)),1e-3));
+kA=0;for(let k=1;k<=8;k++)kA+=sm(Zt(k)-.8,Zt(k),t);
+const uH=lp(-70,PS+DU,sm(82,112,t))+9.6*kA;mr(ip,uH);
+// 剪接体装配、内含子套索弯曲切除与外显子拼接动态
+const spliceVis=sm(81.5,84.5,t)*(1-sm(92.5,95.0,t));
+spliceosomeGroup.scale.setScalar(Math.max(1e-4,spliceVis*1.0));
+if(spliceVis>.01)spliceosomeGroup.rotation.y=t*.4;
+const lariatVis=sm(83.5,86.5,t)*(1-sm(91.0,93.5,t));
+lariatGroup.scale.setScalar(Math.max(1e-4,lariatVis*1.0));
+if(lariatVis>.01){
+  const uDrift=sm(89.0,93.5,t);
+  lariatGroup.position.copy(P_splice).add(v3(uDrift*16,-uDrift*10,uDrift*18));
+  lariatGroup.rotation.set(t*1.2,t*1.5,t*.8);
+  lariatGroup.scale.setScalar(Math.max(1e-4,(1-uDrift*.9)*1.0));
+}
+const sFlashT=sm(88.5,89.1,t)*(1-sm(89.5,90.5,t));
+spliceFlash.scale.setScalar(Math.max(1e-3,55*sFlashT));
+// 核糖体
+const rs=Math.max(sm(100,106,t),1e-3),zr=Zt(9),dis=sm(zr+2,zr+6,t),jn=sm(111,115,t);
+big.position.set(RX,RY+26+70*(1-jn)+45*dis,RZ);sml.position.set(RX,RY-14-30*dis,RZ);big.scale.set(38*rs,30*rs,32*rs);sml.scale.set(26*rs,15*rs,21*rs);
+for(let m=0;m<10;m++){const g=tr[m],at=m?Zt(m)-2.6:TL0-4.5,a=sm(at,at+.8,t),lt=m==9?zr+1.4:Math.min(Zt(m+2),zr+.4),lv=sm(lt,lt+2,t);
+P3.set(RX-9.6*(m-kA),RY+7,RZ);P4.set(RX-25+(m%3-1)*14,RY-85,RZ+(m%2?60:-60));g.position.lerpVectors(P4,P3,a).add(P2.set(28,-55,45).multiplyScalar(lv));g.scale.setScalar(Math.max(1e-3,sm(at,at+.3,t)*(1-lv)));g.updateMatrixWorld(true)}
+// 肽链与多级折叠动态演变
+const Bt=m=>m?Zt(m)-1.2:TL0-2,tip=j=>tr[j].localToWorld(TIP.clone()),rel=sm(zr,zr+1.4,t);
+let mf=-1;for(let m=0;m<9;m++)if(t>=Bt(m))mf=m;
+const pth=(a,s)=>{const L=a.distanceTo(E0);return s<=L&&L>1e-3?a.clone().lerp(E0,s/L):Qp(Math.max(0,s-L))},mm0=Math.max(mf,0),aA=tip(mm0).lerp(E0,rel),aB=(mf>0?tip(mf-1):tip(0)).lerp(E0,rel),fa=mf>0?sm(Bt(mf),Bt(mf)+1,t):1;
+
+// 折叠阶段平滑过渡权重 (由分子伴侣保护腔辅助推进)
+const w01=sm(142.0,145.5,t),w12=sm(147.0,150.5,t),w23=sm(150.5,153.5,t),w34=sm(154.0,157.0,t);
+const scScale=sm(144,147,t),scD1=[v3(0,1,.5),v3(0,-1,-.5),v3(0,1,-.8),v3(0,-1,.7),v3(0,1,.6),v3(0,-1,-.5),v3(0,1,-.7),v3(0,-1,.6),v3(0,1,-.5)];
+const uCru=sm(191.0,204.5,t),curVesPos=transPath.getPointAt(uCru);
+
+for(let k=0;k<9;k++){
+  let q;
+  if(k>mf)q=tip(k);
+  else if(k==mf)q=aA.clone();
+  else q=pth(aB,(mf-1-k)*6.2).lerp(pth(aA,(mf-k)*6.2),fa);
+  
+  let curP=q.clone().lerp(pos1[k],w01).lerp(pos2[k],w12).lerp(pos3[k],w23).lerp(pos4[k],w34);
+  if(t>144&&t<192){
+    const vib=(1-w23*.55)*.3;
+    curP.x+=Math.sin(t*3.5+k*1.8)*vib;
+    curP.y+=Math.cos(t*3.1+k*2.2)*vib;
+    curP.z+=Math.sin(t*2.7+k*1.4)*vib;
+  }
+  if(uCru>0)curP.add(curVesPos.clone().sub(FC));
+  bp[k].copy(curP);
+  ball(bdm,k,bp[k],3.4*(1+.35*w34)*(k<=mf?1:tr[k].scale.x));
+}
+
+// 主链肽键连接
+for(let j=0;j<8;j++)rod(bdl,j,bp[j],bp[j+1],.9,sm(Bt(j+1)+.3,Bt(j+1)+.9,t));
+
+// 侧链 R 基团与末端
+if(scScale>.01){
+  for(let k=0;k<9;k++){
+    const d1=scD1[k];
+    const d2=k<5?v3(pos2[k].x-(FC.x-11),0,pos2[k].z-FC.z).normalize():v3(1,0,k%2?.7:-.7).normalize();
+    const d3=[0,1,4,6,7].includes(k)?v3(FC.x-pos3[k].x,FC.y-pos3[k].y,FC.z-pos3[k].z).normalize():v3(pos3[k].x-FC.x,pos3[k].y-FC.y,pos3[k].z-FC.z).normalize();
+    const curD=d1.clone().lerp(d2,w12).lerp(d3,w23).normalize();
+    const curHead=bp[k].clone().addScaledVector(curD,SC_LENS[k]*(w23>.5?.75:1.0));
+    ball(scMesh,k,curHead,scScale*SC_RADS[k]);
+    rod(scRods,k,bp[k],curHead,.65,scScale);
+    if(k===4){
+      pheRing.position.copy(curHead);
+      pheRing.quaternion.setFromUnitVectors(Y,curD);
+      pheRing.scale.setScalar(scScale);
+    }
+  }
+  const termScale=sm(145,148,t)*(1-sm(164,167,t));
+  const cleaveDrift=sm(164.5,168.0,t);
+  nTermMesh.position.copy(bp[0]).add(v3(-3.2-cleaveDrift*8,cleaveDrift*5,-cleaveDrift*6));
+  cTermMesh.position.copy(bp[8]).add(v3(3.2,0,0));
+  nTermMesh.scale.setScalar(Math.max(1e-4,termScale*2.2*(1-cleaveDrift*.8)));
+  cTermMesh.scale.setScalar(Math.max(1e-4,sm(145,148,t)*(1-sm(175,179,t))*2.2));
+}else{
+  for(let k=0;k<9;k++){
+    ball(scMesh,k,v3(0,-999,0),1e-4);
+    rod(scRods,k,v3(0,-999,0),v3(0,-999,0),1e-4,0);
+  }
+  pheRing.scale.setScalar(1e-4);
+  nTermMesh.scale.setScalar(1e-4);
+  cTermMesh.scale.setScalar(1e-4);
+}
+scMesh.instanceMatrix.needsUpdate=true;
+scRods.instanceMatrix.needsUpdate=true;
+
+// 二级结构：氢键网络 (C=O···H-N)
+const hbAlpha=sm(148,151.5,t)*(1-sm(165,169,t));
+hbMat.opacity=hbAlpha*(.65+.25*Math.sin(t*8));
+for(let j=0;j<6;j++){
+  const pA=bp[HB_PAIRS[j][0]],pB=bp[HB_PAIRS[j][1]];
+  rod(hbCyl,j,pA,pB,.4,hbAlpha>.02?1:0);
+}
+hbCyl.instanceMatrix.needsUpdate=true;
+
+// 三级结构：疏水塌缩与二硫键 / 盐桥
+const ssAlpha=sm(152,155,t)*(1-sm(176,180,t));
+if(ssAlpha>.01){
+  rod(sBridge,0,bp[0].clone().add(v3(1.5,1.2,-1)),bp[4].clone().add(v3(-1.2,.5,.8)),.6,ssAlpha);
+  rod(saltBridge,0,bp[2].clone().add(v3(-1,-1.5,.8)),bp[0].clone().add(v3(.5,1.8,-.5)),.55,ssAlpha);
+}else{
+  rod(sBridge,0,v3(0,-999,0),v3(0,-999,0),1e-4,0);
+  rod(saltBridge,0,v3(0,-999,0),v3(0,-999,0),1e-4,0);
+}
+sBridge.instanceMatrix.needsUpdate=true;
+saltBridge.instanceMatrix.needsUpdate=true;
+const ssFlashT=sm(153.2,154.0,t)*(1-sm(154.5,155.8,t));
+ssFlash.position.copy(bp[4]).lerp(bp[0],.5);
+ssFlash.scale.setScalar(Math.max(1e-3,38*ssFlashT));
+coreGlow.scale.setScalar(Math.max(1e-3,42*sm(151,154,t)*(1-sm(175,180,t))));
+
+// 1. 分子伴侣辅助折叠动态 (GroEL/ES 笼与 ATP 水解)
+const chapVis=sm(144.5,146.5,t)*(1-sm(153.5,155.5,t));
+chaperoneGroup.scale.setScalar(Math.max(1e-4,chapVis*1.0));
+if(chapVis>.01){
+  chaperoneGroup.rotation.y=t*.45;
+  chapLid.position.y=13+sm(152.0,154.5,t)*18;
+  const atpT=sm(148.5,149.2,t)*(1-sm(149.5,150.8,t));
+  atpFlash.scale.setScalar(Math.max(1e-3,52*atpT));
+}else atpFlash.scale.setScalar(1e-4);
+
+// 2. 质量控制与 26S 蛋白酶体降解回收动态
+const protVis=sm(153.5,155.5,t)*(1-sm(165.0,167.0,t));
+proteasomeGroup.scale.setScalar(Math.max(1e-4,protVis*1.0));
+if(protVis>.01){
+  proteasomeGroup.rotation.y=t*.35;
+  const uDeg=sm(155.0,161.0,t),misStart=P_proteasome.clone().add(v3(-16,20,12)),misEntry=P_proteasome.clone().add(v3(0,11,0));
+  const misVis=sm(154.0,155.5,t)*(1-sm(160.0,161.5,t));
+  misfoldedGroup.scale.setScalar(Math.max(1e-4,misVis*1.0));
+  misfoldedGroup.position.lerpVectors(misStart,misEntry,uDeg);
+  misfoldedGroup.rotation.set(t*1.4,t*1.2,t*.9);
+  const fragVis=sm(159.5,161.0,t)*(1-sm(164.5,166.0,t));
+  for(let i=0;i<6;i++){
+    const ang=i*1.05+t*2;
+    ball(fragMesh,i,P_proteasome.clone().add(v3(Math.cos(ang)*sm(160,165,t)*14,-13-sm(160,165,t)*10,Math.sin(ang)*sm(160,165,t)*14)),fragVis*1.2);
+  }
+}else{
+  misfoldedGroup.scale.setScalar(1e-4);
+  for(let i=0;i<6;i++)ball(fragMesh,i,v3(0,-999,0),1e-4);
+}
+fragMesh.instanceMatrix.needsUpdate=true;
+
+// 3. 翻译后修饰 PTMs 动态 (切除信号肽、磷酸化、糖基化)
+const cleaveT=sm(164.2,164.8,t)*(1-sm(165.2,166.5,t));
+cleaveFlash.position.copy(bp[0]);cleaveFlash.scale.setScalar(Math.max(1e-3,38*cleaveT));
+const uPhos=sm(165.5,168.5,t),phosVis=sm(165.0,166.0,t)*(1-sm(204,207,t));
+phosGroup.scale.setScalar(Math.max(1e-4,phosVis*1.0));
+if(phosVis>.01){
+  const P_phos_s=FC.clone().add(v3(18,16,15)),P_phos_t=bp[3].clone().add(v3(1.2,1.8,-1.2));
+  phosGroup.position.lerpVectors(P_phos_s,P_phos_t,uPhos);
+  phosGroup.rotation.set(t*2,t*1.6,t*1.1);
+  const phosFlashT=sm(168.2,168.8,t)*(1-sm(169.2,170.5,t));
+  phosFlash.position.copy(P_phos_t);phosFlash.scale.setScalar(Math.max(1e-3,42*phosFlashT));
+}else phosFlash.scale.setScalar(1e-4);
+const uGly=sm(167.5,171.0,t),glyVis=sm(167.0,168.0,t)*(1-sm(204,207,t));
+glycanGroup.scale.setScalar(Math.max(1e-4,glyVis*1.0));
+if(glyVis>.01){
+  const P_gly_s=FC.clone().add(v3(-20,18,-15)),P_gly_t=bp[5].clone().add(v3(2.5,1.0,1.8));
+  glycanGroup.position.lerpVectors(P_gly_s,P_gly_t,uGly);
+  glycanGroup.rotation.set(Math.sin(t)*.2,t*.5,Math.cos(t)*.2);
+}
+
+// 4. 四级结构动态 (亚基 B 聚合与变构协同催化)
+const ribAlpha=sm(154.5,157.5,t);
+ribbonMat.opacity=ribAlpha*.88;
+ribbonMesh.visible=ribAlpha>.01;
+if(ribAlpha>.01){
+  const breath=1+.018*Math.sin(t*3);
+  ribbonMesh.scale.setScalar(breath);
+  surfMesh.scale.set(1.15*breath,.95*breath,1.05*breath);
+  surfMat.uniforms.k.value=ribAlpha*.75;
+}else surfMat.uniforms.k.value=0;
+
+const uSubB=sm(173.0,178.0,t),subBVis=sm(172.5,173.5,t)*(1-sm(204,207,t));
+subBGroup.scale.setScalar(Math.max(1e-4,subBVis*1.0));
+if(subBVis>.01){
+  subBMat.opacity=subBVis*.88;subBSurfMat.uniforms.k.value=subBVis*.75;
+  const P_subB_start=FC.clone().add(v3(-36,22,26));
+  subBGroup.position.lerpVectors(P_subB_start,FC,uSubB);
+  subBGroup.rotation.y=(1-uSubB)*1.2;
+}
+const interAlpha=sm(177.0,179.0,t)*(1-sm(204,207,t));
+if(interAlpha>.01){
+  rod(interBridge,0,bp[2],bp[2].clone().add(v3(-12,1,4)),.6,interAlpha);
+  rod(interBridge,1,bp[6],bp[6].clone().add(v3(-11,0,3)),.6,interAlpha);
+}else{
+  rod(interBridge,0,v3(0,-999,0),v3(0,-999,0),1e-4,0);
+  rod(interBridge,1,v3(0,-999,0),v3(0,-999,0),1e-4,0);
+}
+interBridge.instanceMatrix.needsUpdate=true;
+
+// 双亚基协同活性催化口袋
+const uSub=sm(182.0,185.8,t),subVis=sm(181.5,182.5,t)*(1-sm(191,194,t));
+subMol.scale.setScalar(Math.max(1e-4,subVis*1.0));
+if(subVis>.01){
+  const P_sub_start=FC.clone().add(v3(26,18,22)),P_coop_active=P_active.clone().add(v3(-6.5,.5,2.5));
+  const subArc=Math.sin(uSub*Math.PI)*6;
+  subMol.position.lerpVectors(P_sub_start,P_coop_active,uSub).add(v3(-subArc*.4,subArc,subArc*.3));
+  subMol.rotation.set(t*1.3,t*1.7,t*.9);
+}
+const catFlare=sm(185.5,186.2,t)*(1-sm(186.8,189.5,t));
+fx.position.copy(P_active.clone().add(v3(-6.5,.5,2.5)));
+fx.scale.setScalar(Math.max(1e-3,90*catFlare));
+
+// 5. 靶向运输囊泡动态 (沿细胞骨架高速公路定向运送，穿梭高尔基体加工，质膜融合胞吐)
+const vesVis=sm(189.0,192.0,t)*(1-sm(202.5,205.0,t));
+vesicleGroup.scale.setScalar(Math.max(1e-4,vesVis*1.0));
+vesicleGroup.position.copy(curVesPos);
+vesicleGroup.rotation.set(t*.35,t*.55,t*.18);
+if(uCru>0){
+  const vShift=curVesPos.clone().sub(FC);
+  ribbonMesh.position.copy(vShift);surfMesh.position.copy(vShift);
+  subBGroup.position.copy(FC.clone().add(vShift));
+  if(vesicleGroup.userData.prevPos){
+    const dPos=curVesPos.clone().sub(vesicleGroup.userData.prevPos);
+    phosGroup.position.add(dPos);glycanGroup.position.add(dPos);
+  }
+}else{
+  ribbonMesh.position.set(0,0,0);surfMesh.position.set(0,0,0);
+}
+vesicleGroup.userData.prevPos=curVesPos.clone();
+
+// 高尔基体微囊泡微动与糖链成熟
+golgiGroup.rotation.y=Math.sin(t*.2)*.08;
+const glyMatT=sm(194.0,197.5,t);
+extraGlyMeshes.forEach(m=>m.scale.setScalar(glyMatT*1.4));
+
+// SNARE 复合体绞合动态与质膜融合孔
+const snareVis=sm(199.0,201.0,t)*(1-sm(206.0,208.5,t));
+snareGroup.scale.setScalar(Math.max(1e-4,snareVis*1.8));
+if(snareVis>.01){
+  const uCoil=sm(199.5,202.5,t);
+  for(let i=0;i<4;i++){
+    const ang=(i/4)*Math.PI*2+uCoil*Math.PI*2.5;
+    const rad=lp(8.5,2.2,uCoil);
+    const rodM=snareRods[i];
+    rodM.position.set(Math.cos(ang)*rad,(uCoil-.5)*5.0,Math.sin(ang)*rad);
+    rodM.scale.set(1.2,lp(26,18,uCoil),1.2);
+    rodM.quaternion.setFromAxisAngle(Y,ang+uCoil*1.8);
+  }
+}
+const uPore=sm(201.2,204.0,t)*(1-sm(206.5,208.5,t));
+poreRing.scale.set(1+uPore*8.0,1+uPore*8.0,1+uPore*2.5);
+const exoFlashT=sm(202.2,203.0,t)*(1-sm(203.8,205.2,t));
+exoFlash.scale.setScalar(Math.max(1e-3,130*exoFlashT));
+
+// 成肽反应释放水分子
+let fl=0;const fq=v3(0,0,0);for(let m=0;m<9;m++){const e=m?(t-Bt(m)-.3)/1.5:-1,on=e>0&&e<1;if(on){fl=Math.sin(e*Math.PI);fq.copy(bp[m-1]).lerp(bp[m],.5)}ball(wm,m,on?P3.copy(bp[m-1]).lerp(bp[m],.5).addScaledVector(v3(5,16,-9),e):P3.set(0,-999,0),on?2*(1-e)+.3:0)}
+bfl.position.copy(fq);bfl.scale.setScalar(Math.max(1e-3,26*fl));wm.instanceMatrix.needsUpdate=true;
+[bdm,bdl].forEach(m=>m.instanceMatrix.needsUpdate=true);
+dA.rotation.y=t*.01;dB2.rotation.y=-t*.006;
+// 相机
+const c=cam(t),zk=lp(1,ZK,sm(0,6,t));C.position.set(c[3]+(c[0]-c[3])*zk+Math.sin(t*.7)*.8,c[4]+(c[1]-c[4])*zk+Math.cos(t*.9)*.8,c[5]+(c[2]-c[5])*zk);C.up.set(Math.sin(t*.3)*.05,1,0);C.lookAt(c[3],c[4],c[5]);
+S.fog.density=(t<10?.0009:t<204?lp(.0009,.0035,sm(10,16,t)):lp(.0035,.00025,sm(204,216,t)))/zk;
+const inN=sm(12,15,t)*(1-sm(96,100,t)),fo=sm(206,215,t);fdm(ENVC,lp(lp(1,.15,sm(12,16,t)),1,fo));fdm(ENVY,(1-inN*.97)*(1-.65*sm(113,118,t)*(1-fo)));fdm(ENVS,1-.75*inN*(1-fo));fdm(ENVP,1-.88*inN);nuM.uniforms.k.value=1-.8*inN*(1-fo);nuO.material.opacity=nuI.material.opacity=.9*(1-.95*inN*(1-fo));halo.scale.setScalar(Math.max(1e-3,240*sm(13,16,t)*(1-sm(96,100,t))));
+GL.forEach(g=>{g.getWorldPosition(P2);const z=g.getWorldScale(P1).x;g.material.opacity=g.userData.o*(g.userData.nf?1:sm(z*.25,z*.9,P2.distanceTo(C.position)))});
+R.render(S,C);
+// UI
+let ci=0;CAPS.forEach((c,i)=>{if(t>=c[0])ci=i});if(ci!=render.ci){render.ci=ci;$('ct').textContent=CAPS[ci][1];$('cd').textContent=CAPS[ci][2]}
+const ch=t<17?-1:t<56?0:t<108?1:t<188?2:t<208?3:-1;document.querySelectorAll('.chip').forEach((e,i)=>e.classList.toggle('on',i==ch));
+$('bar').style.width=t/END*100+'%';
+const w=innerWidth,h=innerHeight;lbs.forEach(l=>{const o=Math.min(sm(l.t0,l.t0+.8,t),1-sm(l.t1-.8,l.t1,t)),p=l.f().project(C);if(o<.02||p.z>1){l.e.style.opacity=0;return}l.e.style.opacity=o;const bw=l.e.offsetWidth/2+6,x=Math.min(w-bw,Math.max(bw,(p.x*.5+.5)*w)),y=Math.min(h-160,Math.max(70,(-p.y*.5+.5)*h));l.e.style.transform=`translate(${x}px,${y}px) translate(-50%,-135%)`})}
+// ===== 控制 =====
+let t=0,play=false,last=0,ZK=1;
+function rz(){const w=innerWidth,h=innerHeight,a=w/h;R.setSize(w,h);C.aspect=a;C.fov=a<1?55+(1-a)*34:55;ZK=a<1?1+(1-a)*1.45:1;C.updateProjectionMatrix()}
+addEventListener('resize',rz);addEventListener('orientationchange',()=>setTimeout(rz,200));rz();
+// ===== 电影级原生合成配乐 (Web Audio API) =====
+const SND=(()=>{
+let ctx=null,master=null,musicGain=null,sfxGain=null,conv=null,dlyL=null,dlyR=null,muted=false,active=false,lastStep=-1,lastBond=-1,padTimer=0,lastT=0;
+const m2f=m=>440*Math.pow(2,(m-69)/12);
+
+// 5 个叙事乐章的和声进行与音阶 (MIDI 音高)
+// 0-17s 序章(D Lydian神秘空灵) | 17-56s DNA复制(Bm9-Gmaj7#11-Dmaj9-Asus4 精密律动)
+// 56-108s 转录与剪接出核(Em9-Cmaj7#11-Gmaj9-A6 流动抒情) | 108-142s 翻译(Dmaj9-A-Bm7-Gmaj7 生命装配)
+// 142-222s 蛋白质折叠修饰、高尔基体分选、质膜融合胞吐与全景终章(Gmaj9-F#m7-Em9-Dmaj9 宏大交响)
+const CHAPS=[
+  {t0:0,t1:17,step:.55,padDur:5.5,
+   chords:[[38,50,57,64,66,73],[31,43,50,57,59,66],[38,50,57,62,66,76],[33,45,52,57,64,69]],
+   arp:[62,66,69,73,74,76,78,81],mel:[74,76,78,81,78,76,74,69]},
+  {t0:17,t1:56,step:.28,padDur:4.2,
+   chords:[[35,47,54,57,62,66],[31,43,50,55,59,66],[38,50,57,62,66,73],[33,45,52,57,62,64]],
+   arp:[59,62,66,69,71,73,74,78],mel:[71,74,73,69,66,71,69,64]},
+  {t0:56,t1:108,step:.38,padDur:4.8,
+   chords:[[40,52,59,62,66,71],[36,48,55,60,64,71],[31,43,50,55,59,66],[33,45,52,57,61,66]],
+   arp:[64,67,71,74,76,79,81,83],mel:[76,79,78,74,71,74,76,71,67,71,74,69]},
+  {t0:108,t1:142,step:.325,padDur:3.9,
+   chords:[[38,50,57,62,66,73],[33,49,57,61,64,69],[35,47,54,57,62,66],[31,43,50,55,59,66]],
+   arp:[62,66,69,74,76,78,81,86],mel:[74,78,81,76,74,69,71,74,78,73]},
+  {t0:142,t1:222,step:.48,padDur:5.8,
+   chords:[[31,43,50,55,59,66,74],[30,42,54,57,61,66,73],[28,40,52,55,59,66,71],[38,50,57,62,66,73,74]],
+   arp:[62,66,69,73,74,78,81,86],mel:[81,78,74,73,74,78,81,86]}
+];
+
+function getChap(t){
+  for(let i=0;i<CHAPS.length;i++)if(t<CHAPS[i].t1||i===CHAPS.length-1)return CHAPS[i];
+  return CHAPS[0];
+}
+
+function init(){
+  if(ctx)return;
+  const AC=window.AudioContext||window.webkitAudioContext;
+  if(!AC)return;
+  ctx=new AC();
+  const comp=ctx.createDynamicsCompressor();
+  comp.threshold.value=-16;comp.knee.value=18;comp.ratio.value=4;comp.attack.value=.01;comp.release.value=.25;
+  master=ctx.createGain();master.gain.value=muted?0:.82;
+  musicGain=ctx.createGain();musicGain.gain.value=.88;
+  sfxGain=ctx.createGain();sfxGain.gain.value=.75;
+
+  // 创建立体声混响脉冲响应 (太空/深海细胞空灵感)
+  const sr=ctx.sampleRate,len=Math.floor(sr*3.4),ir=ctx.createBuffer(2,len,sr);
+  let s1=19,s2=73;
+  const rn1=()=>(s1=s1*16807%2147483647)/2147483647*2-1;
+  const rn2=()=>(s2=s2*48271%2147483647)/2147483647*2-1;
+  const L=ir.getChannelData(0),R=ir.getChannelData(1);
+  let lpL=0,lpR=0;
+  for(let i=0;i<len;i++){
+    const k=i/len,env=Math.pow(1-k,2.5)*Math.min(1,i/(sr*.04));
+    const damp=.18+.65*(1-k);
+    lpL+=damp*(rn1()-lpL);lpR+=damp*(rn2()-lpR);
+    L[i]=lpL*env*.45;R[i]=lpR*env*.45;
+  }
+  conv=ctx.createConvolver();conv.buffer=ir;
+  const revGain=ctx.createGain();revGain.gain.value=.52;
+
+  // 立体声乒乓延时
+  dlyL=ctx.createDelay(1.0);dlyR=ctx.createDelay(1.0);
+  dlyL.delayTime.value=.36;dlyR.delayTime.value=.54;
+  const fbL=ctx.createGain(),fbR=ctx.createGain();
+  fbL.gain.value=.26;fbR.gain.value=.24;
+  const df=ctx.createBiquadFilter();df.type='lowpass';df.frequency.value=2200;
+  dlyL.connect(df);df.connect(dlyR);dlyR.connect(fbL);fbL.connect(dlyL);
+  const dlyOut=ctx.createGain();dlyOut.gain.value=.22;
+  dlyL.connect(dlyOut);dlyR.connect(dlyOut);
+
+  musicGain.connect(comp);sfxGain.connect(comp);
+  musicGain.connect(conv);sfxGain.connect(conv);
+  musicGain.connect(dlyL);sfxGain.connect(dlyL);
+  conv.connect(revGain);revGain.connect(comp);
+  dlyOut.connect(comp);
+  comp.connect(master);master.connect(ctx.destination);
+}
+
+// 温暖合成弦乐/环境铺底 Pad
+function playPadChord(notes,dur,vol,bright){
+  if(!ctx||!active)return;
+  const now=ctx.currentTime;
+  notes.forEach((m,idx)=>{
+    const f=m2f(m),o1=ctx.createOscillator(),o2=ctx.createOscillator(),flt=ctx.createBiquadFilter(),g=ctx.createGain(),pan=ctx.createStereoPanner?ctx.createStereoPanner():null;
+    o1.type=idx===0?'sine':'triangle';
+    o2.type=idx<2?'sine':'sawtooth';
+    o1.frequency.value=f;
+    o2.frequency.value=f*(idx===0?.5:1.0035);
+    flt.type='lowpass';
+    flt.frequency.setValueAtTime(220+bright*350,now);
+    flt.frequency.exponentialRampToValueAtTime(520+bright*1100,now+dur*.45);
+    flt.frequency.exponentialRampToValueAtTime(260+bright*300,now+dur);
+    const v=vol*(idx===0?.34:idx===1?.22:.13/Math.sqrt(idx));
+    g.gain.setValueAtTime(.0001,now);
+    g.gain.linearRampToValueAtTime(v,now+Math.min(1.6,dur*.32));
+    g.gain.setValueAtTime(v*.85,now+dur*.65);
+    g.gain.exponentialRampToValueAtTime(.0001,now+dur+1.4);
+    const g2=ctx.createGain();g2.gain.value=idx<2?.18:.08;
+    o1.connect(flt);o2.connect(g2);g2.connect(flt);flt.connect(g);
+    if(pan){pan.pan.value=((idx%2?1:-1)*Math.min(.75,idx*.16));g.connect(pan);pan.connect(musicGain)}
+    else g.connect(musicGain);
+    o1.start(now);o2.start(now);o1.stop(now+dur+1.5);o2.stop(now+dur+1.5);
+  });
+}
+
+// 晶莹分子琶音 / 钟琴泛音 (Marimba / Celesta Pluck)
+function playPluck(m,dur,vol,panVal,isBell){
+  if(!ctx||!active)return;
+  const now=ctx.currentTime,f=m2f(m),o1=ctx.createOscillator(),o2=ctx.createOscillator(),flt=ctx.createBiquadFilter(),g=ctx.createGain(),pan=ctx.createStereoPanner?ctx.createStereoPanner():null;
+  o1.type='sine';o2.type=isBell?'sine':'triangle';
+  o1.frequency.value=f;o2.frequency.value=f*(isBell?2.998:2.0);
+  flt.type='lowpass';
+  flt.frequency.setValueAtTime(f*4.5,now);
+  flt.frequency.exponentialRampToValueAtTime(Math.max(320,f*1.2),now+dur);
+  const g2=ctx.createGain();
+  g2.gain.setValueAtTime(isBell?.16:.09,now);
+  g2.gain.exponentialRampToValueAtTime(.0001,now+dur*.45);
+  g.gain.setValueAtTime(.0001,now);
+  g.gain.linearRampToValueAtTime(vol,now+.018);
+  g.gain.exponentialRampToValueAtTime(.0001,now+dur);
+  o1.connect(flt);o2.connect(g2);g2.connect(flt);flt.connect(g);
+  if(pan){pan.pan.value=panVal||0;g.connect(pan);pan.connect(musicGain)}
+  else g.connect(musicGain);
+  o1.start(now);o2.start(now);o1.stop(now+dur+.05);o2.stop(now+dur+.05);
+}
+
+// 抒情旋律独奏音色 (用于转录/翻译/终章主题)
+function playLead(m,dur,vol){
+  if(!ctx||!active)return;
+  const now=ctx.currentTime,f=m2f(m),o=ctx.createOscillator(),vib=ctx.createOscillator(),vg=ctx.createGain(),flt=ctx.createBiquadFilter(),g=ctx.createGain();
+  o.type='triangle';o.frequency.value=f;
+  vib.frequency.value=5.2;vg.gain.value=f*.006;
+  vib.connect(vg);vg.connect(o.frequency);
+  flt.type='lowpass';flt.frequency.setValueAtTime(f*2.6,now);
+  flt.frequency.exponentialRampToValueAtTime(f*1.3,now+dur);
+  g.gain.setValueAtTime(.0001,now);
+  g.gain.linearRampToValueAtTime(vol,now+Math.min(.22,dur*.25));
+  g.gain.setValueAtTime(vol*.8,now+dur*.6);
+  g.gain.exponentialRampToValueAtTime(.0001,now+dur+.35);
+  o.connect(flt);flt.connect(g);g.connect(musicGain);
+  o.start(now);vib.start(now);o.stop(now+dur+.4);vib.stop(now+dur+.4);
+}
+
+// 场景专属分子音效 (核孔穿梭、解旋微脉冲、肽键合成水分子闪烁、蛋白质折叠光辉)
+function playShimmer(baseMidi,count,spread,vol){
+  if(!ctx||!active)return;
+  const scale=[0,4,7,11,14,18,21];
+  for(let i=0;i<count;i++){
+    const delay=i*spread,m=baseMidi+scale[i%scale.length];
+    setTimeout(()=>{if(active)playPluck(m,1.4,vol*(1-i/(count*1.6)),(i%2?.45:-.45),true)},delay*1000);
+  }
+}
+
+function tick(t,dt,isPlaying){
+  if(!isPlaying||!ctx){active=false;return}
+  if(ctx.state==='suspended')ctx.resume();
+  active=true;
+  if(Math.abs(t-lastT)>1.2){lastStep=-1;padTimer=0}
+  lastT=t;
+
+  const ch=getChap(t);
+  const progress=(t-ch.t0)/Math.max(1,ch.t1-ch.t0);
+  const chordIdx=Math.floor((t-ch.t0)/ch.padDur)%ch.chords.length;
+  const chord=ch.chords[chordIdx];
+
+  // 1. 铺底和弦触发
+  padTimer-=dt;
+  if(padTimer<=0){
+    padTimer=ch.padDur*.88;
+    const bright=t<17?.45:t<56?.7:t<108?.65:t<142?.85:.95;
+    const fadeOut=t>216?Math.max(.15,1-(t-216)/6):1;
+    playPadChord(chord,ch.padDur*1.05,.24*fadeOut,bright);
+  }
+
+  // 2. 节拍步进器 (琶音与主题旋律)
+  const step=Math.floor(t/ch.step);
+  if(step!==lastStep){
+    lastStep=step;
+    const fadeOut=t>216?Math.max(.1,1-(t-216)/5):1;
+    // 根据不同阶段编排织体密度
+    if(t<17){
+      // 序章：稀疏晶莹的水滴泛音，穿核孔(8-12s)时上行闪烁
+      if(step%2===0){
+        const n=ch.arp[(step/2)%ch.arp.length]+(t>8&&t<13?12:0);
+        playPluck(n,1.8,.085*fadeOut,Math.sin(step)*.5,true);
+      }
+    }else if(t<56){
+      // DNA 复制：解旋与聚合的精密律动琶音
+      const pat=[0,2,4,1,3,5,4,2];
+      const idx=pat[step%pat.length];
+      const oct=(step%16===0||step%16===6)?12:0;
+      playPluck(ch.arp[idx%ch.arp.length]+oct,.65,.09*fadeOut,((step%4)-1.5)*.35,step%4===0);
+      if(step%8===0){
+        // 低音根音轻柔脉动
+        playPluck(chord[0]+12,1.5,.11*fadeOut,0,false);
+      }
+      if(t>40&&step%4===2){
+        // 半保留复制完成时加入温暖高音旋律
+        playLead(ch.mel[(step>>2)%ch.mel.length],1.4,.065*fadeOut);
+      }
+    }else if(t<108){
+      // 转录与剪接出核：流淌的竖琴琶音 + 抒情木管旋律
+      const idx=(step*3+(step>>2))%ch.arp.length;
+      const isPore=t>93&&t<106;
+      playPluck(ch.arp[idx]+(isPore?12:0),1.1,.08*fadeOut,Math.cos(step*.8)*.5,isPore);
+      if(step%4===0){
+        const mNote=ch.mel[(step/4)%ch.mel.length];
+        playLead(mNote,ch.step*3.4,.075*fadeOut);
+      }
+    }else if(t<142){
+      // 翻译：核糖体装配的灵动三拍/四拍律动
+      const idx=step%ch.arp.length;
+      playPluck(ch.arp[idx],.8,.085*fadeOut,Math.sin(step*1.2)*.45,step%3===0);
+      if(step%6===0){
+        playLead(ch.mel[(step/6)%ch.mel.length],ch.step*4.2,.07*fadeOut);
+      }
+    }else{
+      // 蛋白质成熟、高尔基体分选、SNARE 质膜融合与胞吐全景
+      if(step%2===0){
+        const idx=(step/2)%ch.arp.length;
+        playPluck(ch.arp[idx],2.1,.09*fadeOut,Math.sin(step*.7)*.55,true);
+      }
+      if(step%4===0&&t<218){
+        playLead(ch.mel[(step/4)%ch.mel.length],1.9,.08*fadeOut);
+      }
+    }
+  }
+
+  // 3. 关键分子事件同步点缀音 (成肽反应、伴侣供能、蛋白酶体降解、修饰、四级组装、协同催化、高尔基成熟、SNARE胞吐、终章)
+  const bEvt=t<116?
+    (t>=88.5&&t<90.5?88:-1):
+    t<141?Math.floor((t-116.8)/2.6):
+    t>=142.5&&t<144.5?91:
+    t>=148.5&&t<150.5?92:
+    t>=157.0&&t<159.0?93:
+    t>=166.5&&t<168.5?94:
+    t>=177.0&&t<179.0?95:
+    t>=185.5&&t<187.5?96:
+    t>=193.0&&t<195.5?97:
+    t>=202.0&&t<204.5?99:
+    t>=209.0&&t<212.0?98:
+    -1;
+
+  if(bEvt!==lastBond){
+    lastBond=bEvt;
+    if(bEvt>=1&&bEvt<=8){
+      playShimmer(74+(bEvt%4)*2,2,.09,.085);
+    }else if(bEvt===88){
+      playShimmer(72,4,.10,.09);
+    }else if(bEvt===91){
+      playShimmer(64,4,.10,.08);
+    }else if(bEvt===92){
+      playShimmer(76,3,.12,.085);
+    }else if(bEvt===93){
+      playShimmer(58,4,.11,.08);
+    }else if(bEvt===94){
+      playShimmer(79,4,.10,.09);
+    }else if(bEvt===95){
+      playShimmer(67,5,.09,.095);
+    }else if(bEvt===96){
+      playShimmer(72,6,.08,.095);
+    }else if(bEvt===97){
+      playShimmer(74,4,.11,.085);
+    }else if(bEvt===99){
+      playShimmer(81,5,.08,.095);
+    }else if(bEvt===98){
+      playShimmer(62,8,.10,.10);
+    }
+  }
+}
+
+function setPlayState(p){
+  if(p){
+    init();
+    if(ctx&&ctx.state==='suspended')ctx.resume();
+    active=true;
+  }else{
+    active=false;
+  }
+}
+
+function toggleMute(){
+  init();
+  muted=!muted;
+  if(master&&ctx)master.gain.setTargetAtTime(muted?0:.82,ctx.currentTime,.06);
+  return muted;
+}
+
+return{tick,setPlayState,toggleMute,isMuted:()=>muted};
+})();
+const svg=d=>'<svg width="20" height="20" viewBox="0 0 24 24">'+d+'</svg>',IPA=svg('<rect x="6" y="5" width="4" height="14" rx="1.2" fill="#fff"/><rect x="14" y="5" width="4" height="14" rx="1.2" fill="#fff"/>'),IPL=svg('<path d="M8 5.2v13.6l11-6.8z" fill="#fff"/>'),IRP=svg('<path d="M12 5a7 7 0 1 1-6.6 4.7" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="M4 4.5V10h5.5" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'),IMU_ON=svg('<path d="M11 5L6 9H2v6h4l5 4V5z" fill="#fff"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/>'),IMU_OFF=svg('<path d="M11 5L6 9H2v6h4l5 4V5z" fill="#fff"/><path d="M22 9l-6 6M16 9l6 6" fill="none" stroke="#ff7a8a" stroke-width="2.2" stroke-linecap="round"/>');$('pp').innerHTML=IPA;$('rp').innerHTML=IRP;$('mu').innerHTML=IMU_ON;
+document.addEventListener('visibilitychange',()=>{if(document.hidden)setPlay(false)});
+function setPlay(p){play=p;$('pp').innerHTML=p?IPA:IPL;SND.setPlayState(p)}
+$('go').onclick=()=>{$('st').style.opacity=0;setTimeout(()=>$('st').style.display='none',1000);t=0;setPlay(true)};
+$('pp').onclick=()=>{if(t>=END)t=0;setPlay(!play)};$('rp').onclick=()=>{t=0;setPlay(true)};
+$('mu').onclick=()=>{const m=SND.toggleMute();$('mu').innerHTML=m?IMU_OFF:IMU_ON;$('mu').classList.toggle('off',m)};
+const seek=e=>{const r=$('pb').getBoundingClientRect();t=Math.min(END,Math.max(0,(e.clientX-r.left)/r.width*END))};let sk=0;
+$('pb').addEventListener('pointerdown',e=>{sk=1;seek(e)});addEventListener('pointermove',e=>{if(sk)seek(e)});addEventListener('pointerup',()=>sk=0);
+function frame(ms){requestAnimationFrame(frame);const dt=Math.min(.05,(ms-last)/1000||0);last=ms;if(play){t+=dt;if(t>=END){t=END;setPlay(false)}}SND.tick(t,dt,play);render(t)}
+render(0);requestAnimationFrame(frame)}
+if(window.THREE)go();
+</script></body></html>
